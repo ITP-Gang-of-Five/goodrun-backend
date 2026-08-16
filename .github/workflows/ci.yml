@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A new push to a PR cancels the run still in progress for that PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: Formatting (ruff format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups --locked
+
+      - name: Check formatting
+        run: |
+          echo "If this fails, run 'make format' locally and commit the result."
+          uv run ruff format --check --diff .
+
+  lint:
+    name: Linting (ruff check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups --locked
+
+      # --output-format=github turns each finding into an annotation on the
+      # relevant line of the pull request diff.
+      - name: Check for lint errors
+        run: |
+          echo "Unused imports, unsorted imports, likely bugs. Many are fixed by 'make format'."
+          uv run ruff check --output-format=github .
+
+  types:
+    name: Type checking (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups --locked
+
+      - name: Check types
+        run: |
+          echo "Every function in app/ needs type annotations, and the types must line up."
+          uv run mypy
+
+  test:
+    name: Tests & coverage (pytest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # diff-cover needs history to compare the PR against the base branch.
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups --locked
+
+      # --cov-fail-under=0 disables the threshold here so this step fails only on a
+      # genuine test failure. Coverage is judged further down, once the numbers have
+      # been posted to the pull request.
+      - name: Run tests
+        run: uv run pytest --cov --cov-report=xml --cov-fail-under=0
+
+      - name: Measure coverage
+        if: ${{ !cancelled() }}
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # Nothing to measure if pytest died before writing any coverage data.
+          [ -f .coverage ] || exit 0
+
+          uv run coverage report --show-missing --fail-under=0 > coverage-report.txt
+          uv run coverage report --format=total --fail-under=0 > coverage-total.txt
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            uv run diff-cover coverage.xml \
+              --compare-branch="origin/$BASE_REF" \
+              --format "json:diff-cover.json" \
+              --fail-under=0
+          fi
+
+      - name: Build coverage comment
+        if: ${{ !cancelled() && hashFiles('coverage-total.txt') != '' }}
+        run: |
+          uv run python scripts/coverage_comment.py \
+            --report coverage-report.txt \
+            --total "$(cat coverage-total.txt)" \
+            --diff diff-cover.json \
+            --output coverage-comment.md
+
+          cat coverage-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment coverage on PR
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('coverage-comment.md') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body-file coverage-comment.md \
+            --edit-last --create-if-none
+
+      # Both the project total and the coverage of the lines this PR touches must
+      # clear the fail_under threshold in pyproject.toml.
+      - name: Enforce coverage thresholds
+        if: ${{ !cancelled() && hashFiles('coverage-total.txt') != '' }}
+        run: |
+          uv run python scripts/coverage_comment.py \
+            --report coverage-report.txt \
+            --total "$(cat coverage-total.txt)" \
+            --diff diff-cover.json \
+            --check
+
+  security:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Export runtime dependencies
+        run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements.txt
+
+      - name: Audit for known vulnerabilities
+        run: uvx pip-audit -r requirements.txt
+
+  workflows:
+    name: Workflow lint (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Catches YAML mistakes, bad expressions, and unknown action inputs in this
+      # file itself, which nothing else here would notice until a run failed.
+      - name: Lint workflow files
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          curl -sSL -o download-actionlint.bash \
+            "https://raw.githubusercontent.com/rhysd/actionlint/v$ACTIONLINT_VERSION/scripts/download-actionlint.bash"
+          bash download-actionlint.bash "$ACTIONLINT_VERSION"
+          ./actionlint -color

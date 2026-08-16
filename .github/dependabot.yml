@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    # Leave the constraints in pyproject.toml alone when they already allow the
+    # new release, and just refresh uv.lock. Without this, Dependabot raises the
+    # lower bound of every dependency, which is pure churn.
+    versioning-strategy: increase-if-necessary
+    # Give a release a week to have its problems found before proposing it.
+    cooldown:
+      default-days: 7
+    # One pull request a week covering everything, rather than one per package.
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
