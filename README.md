@@ -60,8 +60,9 @@ will run (minus a couple of CI-only jobs like the dependency audit).
   try again.
 - **Types (`mypy`):** every function needs type annotations, and they have to
   be consistent. Fix whatever it names.
-- **Tests (`pytest`):** runs everything in `tests/`. Also fails if too little
-  of `app/` is covered by those tests (see below).
+- **Tests (`pytest`):** runs files in `tests/` named `test_*.py` (underscore,
+  not a hyphen). `test-api.py` is ignored; `test_api.py` is not. Also fails if
+  too little of `app/` is covered by those tests (see below).
 
 If `make check` is green, you can push.
 
@@ -105,6 +106,11 @@ red mark in the PR tells you what broke without having to open the logs.
 
 ### Tests & coverage
 
+Put new tests in `tests/`. The file must be named `test_something.py` and each
+test function must be named `test_something`. Pytest will not collect
+`test-api.py` or a function called `stub_endpoints`. If CI says
+`collected 0 items` / exit code 5, the filename is usually the problem.
+
 Runs `pytest` and enforces two separate coverage rules:
 
 - **Project coverage must stay at or above 50%.** Measured across `app/`.
@@ -123,8 +129,9 @@ Both thresholds come from `fail_under` under `[tool.coverage.report]` in
 ```
 app/            application code (coverage is measured here)
   main.py       FastAPI app and routes
-tests/          test suite
+tests/          test suite (files must be named test_*.py)
   conftest.py   shared fixtures, e.g. the API test client
+  test_api.py   example: tests for the API stubs
 scripts/        CI tooling
   coverage_comment.py   builds and enforces the coverage report CI posts
 .github/
