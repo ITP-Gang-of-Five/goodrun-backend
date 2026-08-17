@@ -30,15 +30,54 @@ It serves on http://127.0.0.1:8000, with interactive docs at http://127.0.0.1:80
 
 ## Before you push
 
+GitHub runs the same checks on every pull request. If they fail, the PR fails.
+Do this on your machine first:
+
 ```bash
+make format
 make check
 ```
 
-This runs the exact same checks as CI. If it passes locally, the pull request will
-pass. If the formatter complains, `make format` fixes it for you automatically.
+Then push.
 
-The pre-commit hooks installed by `make install` also run the formatter and linter
-on every `git commit`, so most problems get caught before they ever reach a PR.
+### `make format` — the linter, and it fixes things for you
+
+Run this whenever you're about to commit (or whenever the linter is yelling).
+It reformats the code and auto-fixes what it can: indentation, quotes, import
+order, unused imports, and similar style issues. It does not change how your
+code behaves.
+
+If you only want to *see* lint errors without touching files, use `make lint`.
+CI uses that check-only version. You usually want `make format` instead, so
+the problems get fixed rather than just listed.
+
+### `make check` — the thing that must pass before you push
+
+This is lint + type checking + tests, in that order. Same set of checks GitHub
+will run (minus a couple of CI-only jobs like the dependency audit).
+
+- **Lint:** fails if `make format` still has work to do. Run `make format` and
+  try again.
+- **Types (`mypy`):** every function needs type annotations, and they have to
+  be consistent. Fix whatever it names.
+- **Tests (`pytest`):** runs everything in `tests/`. Also fails if too little
+  of `app/` is covered by those tests (see below).
+
+If `make check` is green, you can push.
+
+### Commands
+
+| Command | When to use it |
+| --- | --- |
+| `make run` | Start the API locally (http://127.0.0.1:8000, docs at `/docs`) |
+| `make format` | Auto-fix formatting and most lint errors |
+| `make lint` | Report formatting/lint errors without changing files |
+| `make test` | Run tests only |
+| `make check` | Lint + types + tests. Run this before you push |
+
+`make install` also sets up git hooks that run the formatter and linter on
+every commit. That catches style issues early. It does **not** run tests or
+the type checker, so it does not replace `make check`.
 
 ## Adding dependencies
 
@@ -68,8 +107,7 @@ red mark in the PR tells you what broke without having to open the logs.
 
 Runs `pytest` and enforces two separate coverage rules:
 
-- **Project coverage must stay at or above 50%.** Measured across `app/` and
-  `scripts/`.
+- **Project coverage must stay at or above 50%.** Measured across `app/`.
 - **Patch coverage must be at or above 50%.** At least half of the lines *your PR
   changes* must be executed by a test. This is the rule that stops someone merging
   a large untested feature by hiding behind the rest of the codebase.
@@ -87,7 +125,7 @@ app/            application code (coverage is measured here)
   main.py       FastAPI app and routes
 tests/          test suite
   conftest.py   shared fixtures, e.g. the API test client
-scripts/        CI tooling (coverage is measured here too)
+scripts/        CI tooling
   coverage_comment.py   builds and enforces the coverage report CI posts
 .github/
   workflows/ci.yml      the pipeline described above

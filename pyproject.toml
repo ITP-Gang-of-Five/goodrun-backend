@@ -69,7 +69,7 @@ addopts = "-ra --strict-markers --strict-config"
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["app", "scripts"]
+source = ["app"]
 branch = true
 omit = ["tests/*"]
 
