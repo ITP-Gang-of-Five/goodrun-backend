@@ -17,8 +17,7 @@ Then set up the repo:
 make install
 ```
 
-That creates a virtual environment in `.venv`, installs everything from `uv.lock`,
-and installs the git pre-commit hooks.
+That creates a virtual environment in `.venv` and installs everything from `uv.lock`.
 
 Run the API locally:
 
@@ -75,10 +74,6 @@ If `make check` is green, you can push.
 | `make lint` | Report formatting/lint errors without changing files |
 | `make test` | Run tests only |
 | `make check` | Lint + types + tests. Run this before you push |
-
-`make install` also sets up git hooks that run the formatter and linter on
-every commit. That catches style issues early. It does **not** run tests or
-the type checker, so it does not replace `make check`.
 
 ## Adding dependencies
 

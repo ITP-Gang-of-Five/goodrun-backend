@@ -3,7 +3,6 @@
 # One-time setup for a new clone.
 install:
 	uv sync --all-groups
-	uv run pre-commit install
 
 # Rewrites your files to satisfy the formatter and autofixable lint rules.
 format:
