@@ -1,7 +1,26 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from auth.login import validate_password
+from jwtHandler import verify_access_token
 
 app = FastAPI(title="Good Run API", version="0.1.0")
 api = APIRouter(prefix="/api/v0")
+
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    token = credentials.credentials
+    payload = verify_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    return payload
 
 
 @app.get("/health")
@@ -11,7 +30,17 @@ def health() -> dict[str, str]:
 
 # ponytail: stubs only; add auth, validation, and run models when those exist
 @api.post("/auth/login")
-def login() -> dict[str, str]:
+def login(payload: dict[str, str]) -> dict[str, str]:
+    username: str | None = payload.get("username")
+    password: str | None = payload.get("password")
+    if username is None or password is None:
+        print("ERROR - incorrect input")
+        return {}
+
+    user_id = validate_password(username, password)
+
+    print(f"User {user_id} has logged in")
+
     return {"access_token": "", "refresh_token": ""}
 
 
@@ -63,6 +92,12 @@ def complete_run(runID: str) -> None:
 @api.post("/runs/{runID}/remove", status_code=204)
 def remove_run(runID: str) -> None:
     return None
+
+
+@api.post("/whoami}")
+def whoami(jwt_token: str) -> dict | None:
+    print(f"WHOAMI: {verify_access_token(jwt_token)}")
+    return verify_access_token(jwt_token)
 
 
 app.include_router(api)
