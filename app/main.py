@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from auth.login import validate_password
-from jwtHandler import verify_access_token
+from app.auth.login import validate_password, create_login
+from app.auth.jwt_handler import verify_access_token, create_access_token
+
+from app.models.dtos import LoginRequestDto
+
 
 app = FastAPI(title="Good Run API", version="0.1.0")
 api = APIRouter(prefix="/api/v0")
@@ -30,18 +33,35 @@ def health() -> dict[str, str]:
 
 # ponytail: stubs only; add auth, validation, and run models when those exist
 @api.post("/auth/login")
-def login(payload: dict[str, str]) -> dict[str, str]:
+def login(credentials: LoginRequestDto) -> dict[str, str]:
+    print(f"logging in with: {credentials.username, credentials.password}")
+
+    user_id = validate_password(credentials.username, credentials.password)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Username or password incorrect"
+            )
+    
+    token = create_access_token({"userId": user_id})
+
+    print(f"User {user_id} has logged in")
+
+    return {"access_token": token, "refresh_token": ""}
+
+@api.post("/auth/signup")
+def signup(payload: dict[str, str]) -> dict[str, str]:
     username: str | None = payload.get("username")
     password: str | None = payload.get("password")
     if username is None or password is None:
         print("ERROR - incorrect input")
         return {}
 
-    user_id = validate_password(username, password)
+    user_id = create_login(username, password)
 
-    print(f"User {user_id} has logged in")
+    print(f"User {user_id} has signed up")
 
-    return {"access_token": "", "refresh_token": ""}
+    return {"access_token": "YOUVE SIGNEDUP", "refresh_token": "{user_id}"}
 
 
 @api.post("/auth/refresh-token")
