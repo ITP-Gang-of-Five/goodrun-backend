@@ -2,7 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 
-SECRET_KEY = "100"
+# For testing only!
+SECRET_KEY = "1Y[d=&BoY&Y(1Rf(bMOq?OJDA9${Iw-:"
 ALGORITHM = "HS256"
 
 
