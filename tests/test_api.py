@@ -21,5 +21,3 @@ def test_stub_endpoints(
 ) -> None:
     response = client.request(method, path)
     assert response.status_code == status
-
-

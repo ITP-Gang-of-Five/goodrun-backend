@@ -1,13 +1,10 @@
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.auth.jwt_handler import create_access_token, verify_access_token
+from app.auth.login import create_login, validate_password
 from app.common.handlers import init_exception_handlers
-
-from app.auth.login import validate_password, create_login
-from app.auth.jwt_handler import verify_access_token, create_access_token
-
 from app.models.dtos import LoginRequestDto
-
 
 app = FastAPI(title="Good Run API", version="0.1.0")
 api = APIRouter(prefix="/api/v0")
@@ -16,6 +13,7 @@ api = APIRouter(prefix="/api/v0")
 init_exception_handlers(app)
 
 security = HTTPBearer()
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -34,11 +32,13 @@ def get_current_user(
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
+
 @api.post("/auth/login")
 def login(credentials: LoginRequestDto) -> dict[str, str]:
     user_id = validate_password(credentials.username, credentials.password)
     token = create_access_token({"userId": user_id})
     return {"access_token": token, "refresh_token": ""}
+
 
 @api.post("/auth/signup")
 def signup(credentials: LoginRequestDto) -> dict[str, str]:

@@ -1,24 +1,26 @@
 import json
 from pathlib import Path
+
 import bcrypt
-from app.models.entities import LoginRecord
+
 from app.auth.exceptions import *
+from app.models.entities import LoginRecord
 
 BASE_DIR = Path(__file__).resolve().parent
 JSON_FILE_PATH = BASE_DIR / "login.json"
 
+
 def mock_db():
     global JSON_FILE_PATH
     JSON_FILE_PATH = BASE_DIR / "test_login.json"
-    with open(JSON_FILE_PATH, 'w') as f:
+    with open(JSON_FILE_PATH, "w") as f:
         json.dump({}, f)
-
 
 
 def create_login(username: str, password: str) -> int:
     if fetch_login_entry(username):
         raise UserAlreadyExistsError("This username is already in use")
-    
+
     user_password = password.encode("utf-8")
     hashed_password_bytes = bcrypt.hashpw(user_password, bcrypt.gensalt())
     hash_string = hashed_password_bytes.decode("utf-8")
@@ -31,7 +33,7 @@ def create_login(username: str, password: str) -> int:
 # returns if the username and password match and if so returns the users id else None
 def validate_password(username: str, password: str) -> int:
     entry = fetch_login_entry(username)
-    if not entry: 
+    if not entry:
         raise UserNotFoundError("The login record could not be found")
 
     password_bytes: bytes = password.encode("utf-8")
@@ -51,17 +53,18 @@ PLEASE FIX WHEN DB IS IMPLEMENTED
 ---------------------------------
 """
 
+
 # JSON version - replace with actual db version
 def store_login(username: str, hashed_password: str, user_id: int) -> bool:
     if not username or not hashed_password:
         return False
 
-    with open(JSON_FILE_PATH, 'r') as f:
+    with open(JSON_FILE_PATH) as f:
         logins = json.load(f)
 
     logins[username] = {"userId": user_id, "passwordHash": hashed_password}
 
-    with open(JSON_FILE_PATH, 'w') as f:
+    with open(JSON_FILE_PATH, "w") as f:
         json.dump(logins, f)
         return True
 
@@ -70,7 +73,7 @@ def store_login(username: str, hashed_password: str, user_id: int) -> bool:
 def fetch_login_entry(username: str) -> LoginRecord | None:
     if not username:
         return None
-    with open(JSON_FILE_PATH, 'r') as f:
+    with open(JSON_FILE_PATH) as f:
         logins = json.load(f)
         entry = logins.get(username)
         if not entry:
@@ -79,10 +82,12 @@ def fetch_login_entry(username: str) -> LoginRecord | None:
 
 
 def generate_user_id() -> int:
-    with open(JSON_FILE_PATH, 'r') as f:
+    with open(JSON_FILE_PATH) as f:
         login_records = json.load(f)
-        
-        user_ids = [int(login_records[username].get("userId")) for username in login_records]
+
+        user_ids = [
+            int(login_records[username].get("userId")) for username in login_records
+        ]
         if user_ids:
             return max(user_ids) + 1
         else:
