@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-import secrets
+
 import jwt
 
 SECRET_KEY = "100"
