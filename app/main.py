@@ -1,7 +1,33 @@
-from fastapi import APIRouter, FastAPI
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.auth.jwt_handler import create_access_token, verify_access_token
+from app.auth.login import create_login, validate_password
+from app.common.handlers import init_exception_handlers
+from app.models.dtos import LoginRequestDto
 
 app = FastAPI(title="Good Run API", version="0.1.0")
 api = APIRouter(prefix="/api/v0")
+
+# this converts domain and unauthorised errors into correct response codes
+init_exception_handlers(app)
+
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+) -> int | None:
+    token = credentials.credentials
+    payload = verify_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    return payload.get("userId")
 
 
 @app.get("/health")
@@ -9,10 +35,18 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# ponytail: stubs only; add auth, validation, and run models when those exist
 @api.post("/auth/login")
-def login() -> dict[str, str]:
-    return {"access_token": "", "refresh_token": ""}
+def login(credentials: LoginRequestDto) -> dict[str, str]:
+    user_id = validate_password(credentials.username, credentials.password)
+    token = create_access_token({"userId": user_id})
+    return {"access_token": token, "refresh_token": ""}
+
+
+@api.post("/auth/signup")
+def signup(credentials: LoginRequestDto) -> dict[str, str]:
+    user_id = create_login(credentials.username, credentials.password)
+    token = create_access_token({"userId": user_id})
+    return {"access_token": token, "refresh_token": ""}
 
 
 @api.post("/auth/refresh-token")
@@ -63,6 +97,12 @@ def complete_run(runID: str) -> None:
 @api.post("/runs/{runID}/remove", status_code=204)
 def remove_run(runID: str) -> None:
     return None
+
+
+@api.post("/whoami}")
+def whoami(jwt_token: str) -> dict | None:
+    print(f"WHOAMI: {verify_access_token(jwt_token)}")
+    return verify_access_token(jwt_token)
 
 
 app.include_router(api)
