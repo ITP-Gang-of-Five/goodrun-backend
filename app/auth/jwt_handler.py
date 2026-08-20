@@ -7,7 +7,7 @@ ALGORITHM = "HS256"
 
 
 def create_access_token(
-    data: dict, expires_delta: timedelta = timedelta(minutes=15)
+    data: dict, expires_delta: timedelta = timedelta(days=1)
 ) -> str:
     """Generates a secure server-side JWT."""
     payload = data.copy()
