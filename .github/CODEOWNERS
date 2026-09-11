@@ -1,0 +1,11 @@
+# The CI pipeline, Dependabot config, and this file itself.
+/.github/                 @ITP-Gang-of-Five/maintainers
+
+# Holds the coverage threshold that both coverage gates read.
+/pyproject.toml           @ITP-Gang-of-Five/maintainers
+
+# Builds and enforces the coverage report CI posts.
+/scripts/                 @ITP-Gang-of-Five/maintainers
+
+# Hook definitions that run on every developer's machine.
+/.pre-commit-config.yaml  @ITP-Gang-of-Five/maintainers
