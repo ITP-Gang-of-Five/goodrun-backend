@@ -1,0 +1,7 @@
+#NB: used AI to help come up with this gitignore, as there are quite a few leftovers from the CI pipeline that we don't want messing up the repo
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
