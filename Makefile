@@ -1,15 +1,16 @@
 .PHONY: install format lint typecheck test check run
+#NB: used AI to help with this makefile, it will install everything we setup in the CI pipeline
 
-# One-time setup for a new clone.
+#must run this as a one time thing to setup
 install:
 	uv sync --all-groups
 
-# Rewrites your files to satisfy the formatter and autofixable lint rules.
+#actually writes formatting changes
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
 
-# Read-only: the same checks CI runs.
+# read only lint checks
 lint:
 	uv run ruff format --check --diff .
 	uv run ruff check .
@@ -20,7 +21,6 @@ typecheck:
 test:
 	uv run pytest --cov --cov-report=term-missing
 
-# Run this before pushing. If it passes, CI will pass.
 check: lint typecheck test
 
 run:
