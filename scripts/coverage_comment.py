@@ -1,5 +1,5 @@
-#NB: used AI for this, it will provide us with a comment of how much coverage we have in test cases for our CI pipeline
-#It is purely for quality of ilfe, and is something quite new to me, thus I used AI to assist in creating it
+# NB: used AI for this, it will provide us with a comment of how much coverage we have in test cases for our CI pipeline
+# It is purely for quality of ilfe, and is something quite new to me, thus I used AI to assist in creating it
 
 """Render and enforce the coverage summary that CI posts on pull requests.
 
