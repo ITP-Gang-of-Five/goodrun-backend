@@ -41,12 +41,12 @@ def test_runs_can_be_added_and_updated() -> None:
                 created_at=datetime.now(UTC),
             )
         )
-        #ensure the run now exists
+        # ensure the run now exists
         assert get_database().get_run(run.id) == run
-        #start the run
+        # start the run
         started = run.model_copy(update={"status": RunStatus.IN_PROGRESS})
         get_database().update_run(started)
-        #ensure ti started
+        # ensure ti started
         assert get_database().get_run(run.id) == started
     finally:
         # then restore the original, in case we fail assertions
@@ -91,9 +91,9 @@ def test_orders_can_be_added_and_updated() -> None:
                 created_at=datetime.now(UTC),
             )
         )
-        #ensure run was made
+        # ensure run was made
         assert get_database().get_order(order.id) == order
-        #ensure its status can be updated
+        # ensure its status can be updated
         updated = order.model_copy(update={"status": OrderStatus.CANCELLED})
         get_database().update_order(updated)
         assert get_database().get_order(order.id) == updated

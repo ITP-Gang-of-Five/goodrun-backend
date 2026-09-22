@@ -11,7 +11,7 @@ DB_FILE = Path(__file__).parent / "db.json"
 """
 I'm not sure how much of this is going to be needed once we've got the database setup. I've tried to make it
 as adaptable as possible in case. But if not I'm happy to scrap all this code. It defines all the enums and models
-corresponding to our tables from the data model, then has its own database interface for our code to interact with. 
+corresponding to our tables from the data model, then has its own database interface for our code to interact with.
 
 """
 
@@ -136,10 +136,9 @@ class VolunteerLocation(BaseModel):
 
 """
 -----------------------------------------------------------------------------------------------------------------------
-
 Database class. This contains the entire fake JSON database, with one function per table.
 
-I presume that this is how we will interact with the database, but Maxim is the expert on that, so, like I said, if 
+I presume that this is how we will interact with the database, but Maxim is the expert on that, so, like I said, if
 it ends up being different we can scrap this code idc.
 
 Note that all of these functions are almost identical, they are just working on different objects and different
