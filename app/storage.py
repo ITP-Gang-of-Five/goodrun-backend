@@ -20,6 +20,8 @@ corresponding to our tables from the data model, then has its own database inter
 -----------------------------------------------------------------------------------------------------------------------
 Below are all of the ENUMs based on the data model, including things like statuses, user roles, etc
 """
+
+
 class Role(StrEnum):
     ADMIN = "ADMIN"
     VOLUNTEER = "VOLUNTEER"
@@ -76,7 +78,7 @@ class User(BaseModel):
 class Location(BaseModel):
     id: int
     name: str
-    #TODO: I've made this optional based on the data model, but the data model might need to change cause this seems peculiar
+    # TODO: I've made this optional based on the data model, but the data model might need to change cause this seems peculiar
     address: str | None = None
     latitude: float
     longitude: float
@@ -124,7 +126,7 @@ class OrderImage(BaseModel):
     created_at: datetime
 
 
-#NB: latest known positiion of a volunteer (where each volunteer gets a single row in the table for this)
+# NB: latest known positiion of a volunteer (where each volunteer gets a single row in the table for this)
 class VolunteerLocation(BaseModel):
     volunteer_id: int
     latitude: float
@@ -144,6 +146,7 @@ Note that all of these functions are almost identical, they are just working on 
 'tables' within the 'database'. They are all very elemetnray, get, put, update
 """
 
+
 class Database:
     def _read(self) -> dict[str, Any]:
         return json.loads(DB_FILE.read_text())
@@ -151,56 +154,56 @@ class Database:
     def _write(self, data: dict[str, Any]) -> None:
         DB_FILE.write_text(json.dumps(data, indent=2))
 
-    #helper to grab the next id for a table (I think this dumbly simulates what real databases do)
+    # helper to grab the next id for a table (I think this dumbly simulates what real databases do)
     def _next_id(self, rows: list[dict[str, Any]]) -> int:
         return max((row["id"] for row in rows), default=0) + 1
-
 
     """
     ---------
     Users
     ---------
     """
+
     def get_user(self, user_id: int) -> User | None:
-        #Return the full User row based on user id
+        # Return the full User row based on user id
         for user in self.list_users():
             if user.id == user_id:
                 return user
         return None
 
     def get_user_by_email(self, email: str) -> User | None:
-        #same as above but with email
+        # same as above but with email
         for user in self.list_users():
             if user.email == email:
                 return user
         return None
 
     def list_users(self) -> list[User]:
-        #returns a list of User objects constructed from the users portion of the JSON database
+        # returns a list of User objects constructed from the users portion of the JSON database
         return [User(**row) for row in self._read()["users"]]
-
 
     """
     ---------
     Location
     ---------
     """
+
     def get_location(self, location_id: int) -> Location | None:
-        #return Location object from id
+        # return Location object from id
         for location in self.list_locations():
             if location.id == location_id:
                 return location
         return None
 
     def list_locations(self) -> list[Location]:
-        #return list of Location objects, constructed from location portion of the JSON db (same as w users)
+        # return list of Location objects, constructed from location portion of the JSON db (same as w users)
         return [Location(**row) for row in self._read()["locations"]]
 
     def add_location(self, location: Location) -> Location:
         data = self._read()
-        #take the parsed in location and update its id
+        # take the parsed in location and update its id
         stored = location.model_copy(update={"id": self._next_id(data["locations"])})
-        #append a JSON conversion of the location object
+        # append a JSON conversion of the location object
         data["locations"].append(json.loads(stored.model_dump_json()))
         self._write(data)
         return stored
@@ -212,7 +215,7 @@ class Database:
     """
 
     def get_run(self, run_id: int) -> Run | None:
-        #same as all else get run object by id
+        # same as all else get run object by id
         for run in self.list_runs():
             if run.id == run_id:
                 return run
@@ -223,7 +226,7 @@ class Database:
 
     def add_run(self, run: Run) -> Run:
         data = self._read()
-        #overwrite with the next id and save to db by converting the Run object into json
+        # overwrite with the next id and save to db by converting the Run object into json
         stored = run.model_copy(update={"id": self._next_id(data["runs"])})
         data["runs"].append(json.loads(stored.model_dump_json()))
         self._write(data)
@@ -233,7 +236,7 @@ class Database:
         data = self._read()
         for index, row in enumerate(data["runs"]):
             if row["id"] == run.id:
-                #write to json
+                # write to json
                 data["runs"][index] = json.loads(run.model_dump_json())
                 self._write(data)
                 return
@@ -246,7 +249,7 @@ class Database:
     """
 
     def get_order(self, order_id: int) -> Order | None:
-        #same as all others
+        # same as all others
         for order in self.list_orders():
             if order.id == order_id:
                 return order
@@ -283,7 +286,7 @@ class Database:
             for row in self._read()["order_events"]
             if row["order_id"] == order_id
         ]
-        #sort by the oldest event first
+        # sort by the oldest event first
         return sorted(events, key=lambda event: event.created_at)
 
     def add_order_event(self, event: OrderEvent) -> OrderEvent:
@@ -332,7 +335,7 @@ class Database:
         return None
 
     def upsert_volunteer_location(self, location: VolunteerLocation) -> None:
-        #update or insert. if the location exists just ovewrite it
+        # update or insert. if the location exists just ovewrite it
         data = self._read()
         rows = [
             row
