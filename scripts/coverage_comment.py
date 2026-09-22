@@ -74,8 +74,7 @@ def build_comment(
     if patch is not None:
         lines += [
             "- **Patch coverage** is how much of the code *this pull request* adds "
-            "or changes that the test suite runs. This is the one that usually "
-            "fails: it stops new, untested code from being merged.",
+            "or changes that the test suite runs.",
         ]
     lines.append("")
 
