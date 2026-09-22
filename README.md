@@ -27,7 +27,7 @@ To actually run fast api, which should spawn the backend on `localhost:8000`
 `make format` formats and auto fixes linting issues
 `make lint` checks formatting and liniting
 `make typecheck` runs mypy to ensure all our types follow their definitions
-`make tests` runs test cases
+`make test` runs test cases
 `make check` runs all fo lint, typcheck and test. this is what you should run before pushing your PR.
 
 # Repo Layout
