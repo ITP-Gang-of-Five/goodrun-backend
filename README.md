@@ -20,31 +20,17 @@ then use
 make run
 ```
 To actually run fast api, which should spawn the backend on `localhost:8000`
-## Getting started
 
-Requires 
 
-```sh
-make install
-make run
-```
+# General Commands to Run
 
-The API serves on `http://localhost:8000`, with interactive docs at `/docs`.
+`make format` formats and auto fixes linting issues
+`make lint` checks formatting and liniting
+`make typecheck` runs mypy to ensure all our types follow their definitions
+`make tests` runs test cases
+`make check` runs all fo lint, typcheck and test. this is what you should run before pushing your PR.
 
-## Commands
-
-| Command          | What it does                                   |
-| ---------------- | ---------------------------------------------- |
-| `make install`   | Install dependencies                           |
-| `make run`       | Start the API in dev mode                      |
-| `make format`    | Format and autofix lint issues                 |
-| `make lint`      | Check formatting and lint (what CI runs)       |
-| `make typecheck` | Run mypy                                       |
-| `make test`      | Run the tests with coverage                    |
-| `make check`     | Lint, typecheck and test. Run before pushing   |
-
-## Layout
-
+# Repo Layout
 ```
 app/
   main.py        FastAPI app
