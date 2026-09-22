@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 LOGIN = "/api/v0/auth/login"
 REFRESH = "/api/v0/auth/refresh-token"
 
-#hard code the only creds we have for test cases
+# hard code the only creds we have for test cases
 ADMIN = {"email": "admin", "password": "admin"}
 
 
