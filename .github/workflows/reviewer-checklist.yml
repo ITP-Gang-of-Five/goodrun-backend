@@ -1,0 +1,63 @@
+name: Reviewer Checklist
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  post-checklist:
+    name: Post code review checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post checklist comment
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = "<!-- reviewer-checklist -->";
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            if (comments.some((c) => c.body && c.body.includes(marker))) {
+              return;
+            }
+
+            const body = [
+              marker,
+              "## Reviewer checklist",
+              "",
+              "Please confirm the following before approving this PR:",
+              "",
+              "### Code Quality",
+              "- [ ] Requirements have been met",
+              "- [ ] Code is formatted correctly",
+              "- [ ] Single Responsibility Principle followed",
+              "- [ ] Errors handled correctly",
+              "- [ ] Errors/warnings logged appropriately",
+              "- [ ] Magic values avoided",
+              "- [ ] Code is readable",
+              "- [ ] DRY principle followed",
+              "",
+              "### Testing",
+              "- [ ] Unit tests pass",
+              "- [ ] Manual test plan passes",
+              "- [ ] Edge cases tested",
+              "- [ ] Invalid inputs validated",
+              "",
+              "### Documentation",
+              "- [ ] Documentation is sufficient",
+              "- [ ] README is up to date",
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
