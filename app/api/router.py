@@ -9,6 +9,7 @@ from fastapi import APIRouter
 
 from app.auth.router import router as auth_router
 from app.locations.router import router as locations_router
+from app.me.router import router as me_router
 from app.orders.router import router as orders_router
 from app.organisations.router import router as organisations_router
 from app.runs.router import router as runs_router
@@ -18,6 +19,7 @@ api_router = APIRouter(prefix="/api/v0")
 
 for domain_router in (
     auth_router,
+    me_router,
     orders_router,
     runs_router,
     volunteers_router,
