@@ -22,6 +22,13 @@ make run
 To actually run fast api, which should spawn the backend on `localhost:8000`
 
 
+# Helpful Coding Practices
+
+If your using VS CODE I highly reccomend that you install the Python extension. You can then click command shift p or ctrl shift p and 
+type in 'interpreter' then hit enter on select python interpreter. select your interpreter. this will allow you to press comand (or contorl for windows) and click
+on any class or function to automatically take you to the code that defines. its very helpful because we have quite a complicated / abstracted structure.
+
+
 # General Commands to Run
 
 `make format` formats and auto fixes linting issues
