@@ -1,21 +1,16 @@
-from collections.abc import Iterator
-
-import pytest
 from fastapi.testclient import TestClient
-
-from app.storage import DB_FILE
 
 ORDERS = "/api/v0/orders/"
 LOGIN = "/api/v0/auth/login"
 
 """
-NB: some test cases here are hard coded to the JSON db. This is because the endpoitns for making volunteers and orgs
-don't exist yet. in the future every test case should itself create the users, orders, runs that it needs and then
-run checks on them instead of hard coding to what we have
+NB: some test cases here are hard coded to the seeded data in app/seed.sql. In the future
+every test case should create the users, orders and runs it needs rather than relying on
+what happens to be seeded.
 
+Nothing a test writes survives it: conftest wraps each one in a transaction that is
+rolled back, which is what the old preserve_db fixture used to do by hand.
 """
-# NB: I've just hard coded these values for the test cases. since we will be scrapping the JSON
-# database soon there is no point implementing smth to go and grab real creds dynamically
 ADMIN = {"email": "admin", "password": "admin"}
 VOLUNTEER = {"email": "tara@example.com", "password": "volunteer"}
 ORGANISATION = {"email": "stores@rmh.example.com", "password": "organisation"}
@@ -27,19 +22,8 @@ def _auth_headers(client: TestClient, credentials: dict[str, str]) -> dict[str, 
     return {"Authorization": f"Bearer {token}"}
 
 
-# a fixture to run before any test cases run
-@pytest.fixture
-def preserve_db() -> Iterator[None]:
-    # store the original database
-    original = DB_FILE.read_text()
-    # yield and run the test case
-    yield
-    # write the original database back (since our test cases can modify the data, we don't want that to persist)
-    DB_FILE.write_text(original)
-
-
 def test_admin_can_create_and_then_get_an_order(
-    client: TestClient, preserve_db: None
+    client: TestClient,
 ) -> None:
     # get headers for an admin user (so API key correctly corresponds to an admin)
     headers = _auth_headers(client, ADMIN)
@@ -133,7 +117,7 @@ def test_creating_an_order_rejects_an_unknown_location(client: TestClient) -> No
 
 
 def test_volunteer_only_sees_available_orders_that_fit_their_car_size(
-    client: TestClient, preserve_db: None
+    client: TestClient,
 ) -> None:
 
     admin_headers = _auth_headers(client, ADMIN)
@@ -194,7 +178,7 @@ def test_organisation_only_sees_its_own_orders(client: TestClient) -> None:
 
 
 def test_removing_an_order_already_on_a_run_is_rejected(
-    client: TestClient, preserve_db: None
+    client: TestClient,
 ) -> None:
     headers = _auth_headers(client, ADMIN)
     response = client.post(f"{ORDERS}1/remove", headers=headers)

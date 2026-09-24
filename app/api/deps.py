@@ -1,37 +1,46 @@
 """
 Shared dependenices for pulling the caller off the Auth header and gating endpoints
 to certain roles.
-NB: Eveyr domain router should use these instead of implementing their own auth
 """
 
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.tokens import read_token
 from app.errors import ApiError
-from app.storage import Role, User, get_database
+from app.queries import QueriesDep
+from app.storage import Role, User
+
+"""
+Declares that this API is authenticated with a bearer token, which does two things
+beyond reading the header for us:
+"""
+bearer_scheme = HTTPBearer(auto_error=False)
+
+BearerToken = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]
 
 """
 Retrieve the current User (storage model) based on their auth header
 """
 
 
-def get_current_user(authorization: Annotated[str | None, Header()] = None) -> User:
+def get_current_user(queries: QueriesDep, credentials: BearerToken = None) -> User:
     # requests must have the Authorization header with a bearer token
-    if authorization is None or not authorization.startswith("Bearer "):
+    if credentials is None:
         raise ApiError(401, "UNAUTHORISED", "Missing or invalid Authorization header")
 
     # the bearer token must be a valid access (not refresh) token for the user
-    user_id = read_token(authorization.removeprefix("Bearer "), "access")
-    user = get_database().get_user(user_id)
+    user_id = read_token(credentials.credentials, "access")
+    user = queries.get_user(user_id)
     if user is None:
         raise ApiError(401, "UNAUTHORISED", "User doesn't exist")
     return user
 
 
-# Dependencny shortcut: this allows us to grab the current logged in user without repeating auth logic at every endpoin
+# this allows us to grab the current logged in user without repeating auth logic at every endpoin
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
@@ -52,9 +61,7 @@ def require_role(*roles: Role) -> Callable[[CurrentUser], User]:
 
 
 """
-More dependencey shortcuts, taking in a user and handing it back as an admin, volunteer
-admin or org. we can add more later since some endpoints are accessible by: any user type,
-only one user type, two user types
+More dependencey shortcuts
 """
 AdminUser = Annotated[User, Depends(require_role(Role.ADMIN))]
 VolunteerUser = Annotated[User, Depends(require_role(Role.VOLUNTEER))]

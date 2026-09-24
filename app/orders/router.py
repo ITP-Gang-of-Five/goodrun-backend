@@ -19,9 +19,9 @@ from app.orders.schemas import (
     TrackingResponse,
     UploadImageRequest,
 )
+from app.queries import Queries, QueriesDep
 from app.storage import (
     CarSize,
-    Database,
     Order,
     OrderEvent,
     OrderImage,
@@ -31,7 +31,6 @@ from app.storage import (
     RunStatus,
     Urgency,
     User,
-    get_database,
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -65,7 +64,7 @@ def _fits(car_size: CarSize | None, order_size: CarSize) -> bool:
 
 
 # returns a dictionary of the fields for a location object
-def _location_fields(db: Database, location_id: int) -> dict[str, object]:
+def _location_fields(db: Queries, location_id: int) -> dict[str, object]:
     location = db.get_location(location_id)
     # orders only ever store location ids that were validated to exist at creation time
     assert location is not None
@@ -82,7 +81,7 @@ Returns a UserRef for a user based on their id
 """
 
 
-def _user_ref(db: Database, user_id: int) -> UserRef:
+def _user_ref(db: Queries, user_id: int) -> UserRef:
     user = db.get_user(user_id)
     return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
 
@@ -92,7 +91,7 @@ Returns a UserRef or none if userId is none. just a helpful wrapper
 """
 
 
-def _optional_user_ref(db: Database, user_id: int | None) -> UserRef | None:
+def _optional_user_ref(db: Queries, user_id: int | None) -> UserRef | None:
     return None if user_id is None else _user_ref(db, user_id)
 
 
@@ -101,7 +100,7 @@ Returns the Run an order is on, or None if it isn't assigned to one yet
 """
 
 
-def _order_run(db: Database, order: Order) -> Run | None:
+def _order_run(db: Queries, order: Order) -> Run | None:
     return db.get_run(order.run_id) if order.run_id is not None else None
 
 
@@ -111,7 +110,7 @@ a run yet (and thus isn't assigned to a volunteer)
 """
 
 
-def _volunteer_ref(db: Database, order: Order) -> UserRef | None:
+def _volunteer_ref(db: Queries, order: Order) -> UserRef | None:
     run = _order_run(db, order)
     return _optional_user_ref(db, run.volunteer_id if run else None)
 
@@ -121,7 +120,7 @@ converts an order from a database entry into a dictionary for use
 """
 
 
-def _order_fields(db: Database, order: Order) -> dict[str, object]:
+def _order_fields(db: Queries, order: Order) -> dict[str, object]:
     return {
         "order_id": str(order.id),
         "run_id": str(order.run_id) if order.run_id is not None else None,
@@ -143,11 +142,11 @@ def _order_fields(db: Database, order: Order) -> dict[str, object]:
 
 
 """
-Converts a Database order into an OrderOut (an order object for response)
+Converts a stored order into an OrderOut (an order object for response)
 """
 
 
-def _order_out(db: Database, order: Order) -> OrderOut:
+def _order_out(db: Queries, order: Order) -> OrderOut:
     return OrderOut(**_order_fields(db, order))
 
 
@@ -157,7 +156,7 @@ If its an organisation, they can only view it if they are the 'to' or 'from' org
 """
 
 
-def _can_view(db: Database, actor: User, order: Order) -> bool:
+def _can_view(db: Queries, actor: User, order: Order) -> bool:
     if actor.role == Role.ADMIN:
         return True
     if actor.role == Role.ORGANISATION:
@@ -172,7 +171,7 @@ the user is able to view it.
 """
 
 
-def _require_order(db: Database, actor: User, order_id: int) -> Order:
+def _require_order(db: Queries, actor: User, order_id: int) -> Order:
     order = db.get_order(order_id)
     # Not found rather than forbidden, so orders can't be probed for existence.
     if order is None or not _can_view(db, actor, order):
@@ -185,7 +184,7 @@ Takes in an Order object and a status and adds an event to the database for this
 """
 
 
-def _record_event(db: Database, order: Order, status: OrderStatus) -> None:
+def _record_event(db: Queries, order: Order, status: OrderStatus) -> None:
     db.add_order_event(
         OrderEvent(
             id=0, order_id=order.id, new_status=status, created_at=datetime.now(UTC)
@@ -208,8 +207,7 @@ Returns an OrdersResponse for the current Volunteer containing the list of avail
 
 
 @router.get("/available")
-def get_available_orders(volunteer: VolunteerUser) -> OrdersResponse:
-    db = get_database()
+def get_available_orders(volunteer: VolunteerUser, db: QueriesDep) -> OrdersResponse:
 
     # retrieve all orders with the ready for pickup status
     ready_orders = [
@@ -236,6 +234,7 @@ For Organisations it will only return the orders they are assigned to in some re
 @router.get("/")
 def get_orders(
     actor: AdminOrOrganisationUser,
+    db: QueriesDep,
     status: OrderStatus | None = None,
     size: CarSize | None = None,
     urgency: Urgency | None = None,
@@ -247,7 +246,6 @@ def get_orders(
     # offset for pagination
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> OrdersResponse:
-    db = get_database()
 
     # set organisation_id to this actor.
     if actor.role == Role.ORGANISATION:
@@ -303,8 +301,9 @@ Endpoint to create a run
 
 
 @router.post("/", status_code=201)
-def create_order(body: CreateOrderRequest, admin: AdminUser) -> OrderIdResponse:
-    db = get_database()
+def create_order(
+    body: CreateOrderRequest, admin: AdminUser, db: QueriesDep
+) -> OrderIdResponse:
 
     # Step 1: extract all the locations that are set for the order. raise error if those locations aren't found
     for location_id in (body.from_location_id, body.to_location_id):
@@ -357,8 +356,7 @@ Get a single order based on its id
 
 
 @router.get("/{order_id}")
-def get_order(order_id: int, actor: CurrentUser) -> OrderDetailOut:
-    db = get_database()
+def get_order(order_id: int, actor: CurrentUser, db: QueriesDep) -> OrderDetailOut:
     # NB: _require_order will raise an API error if the order doesn't exist
     order = _require_order(db, actor, order_id)
 
@@ -391,8 +389,7 @@ Remove a specified order
 
 
 @router.post("/{order_id}/remove", status_code=204)
-def remove_order(order_id: int, admin: AdminUser) -> Response:
-    db = get_database()
+def remove_order(order_id: int, admin: AdminUser, db: QueriesDep) -> Response:
     order = _require_order(db, admin, order_id)
     # only an order that is not in a run can be removed
     if order.run_id is not None:
@@ -413,8 +410,9 @@ Get a TrackingResponse for a defined order (admin only)
 
 
 @router.get("/{order_id}/tracking")
-def track_order(order_id: int, actor: AdminOrOrganisationUser) -> TrackingResponse:
-    db = get_database()
+def track_order(
+    order_id: int, actor: AdminOrOrganisationUser, db: QueriesDep
+) -> TrackingResponse:
     # NB: _require_order will raise an API error if the order doesn't exist
     order = _require_order(db, actor, order_id)
 
@@ -447,9 +445,8 @@ Upload an image for the order
 
 @router.post("/{order_id}/images", status_code=201)
 def upload_order_image(
-    order_id: int, body: UploadImageRequest, volunteer: VolunteerUser
+    order_id: int, body: UploadImageRequest, volunteer: VolunteerUser, db: QueriesDep
 ) -> ImageIdResponse:
-    db = get_database()
     order = _require_order(db, volunteer, order_id)
 
     # image can only be uploaded to an in progress run
@@ -469,13 +466,14 @@ def upload_order_image(
     if not raw or len(raw) > _MAX_IMAGE_BYTES:
         raise ApiError(422, "VALIDATION_ERROR", "image must be between 1 byte and 8MB")
 
-    # add an order image to the order with the base64 blob of image data
+    # stored as raw bytes, not base64. We already decoded it to check it above, so
+    # the decode happens once here rather than on every download.
     image = db.add_order_image(
         OrderImage(
             id=0,
             order_id=order.id,
             content_type=body.content_type,
-            data_base64=body.data,
+            image_data=raw,
             created_at=datetime.now(UTC),
         )
     )
@@ -488,16 +486,17 @@ Get a specific image for an order based on order id and image id
 
 
 @router.get("/{order_id}/images/{image_id}", response_class=Response)
-def get_order_image(order_id: int, image_id: int, actor: CurrentUser) -> Response:
+def get_order_image(
+    order_id: int, image_id: int, actor: CurrentUser, db: QueriesDep
+) -> Response:
     # NB: this endpoint returns RAW BYTES rather than JSON!!!!
-    db = get_database()
     order = _require_order(db, actor, order_id)
     image = db.get_order_image(image_id)
     if image is None or image.order_id != order.id:
         raise ApiError(404, "ORDER_NOT_FOUND", "No image with that id on this order")
     # we must construct our own response for this
     return Response(
-        # content is set to the base64 of the image blob and media type is set to an iamge
-        content=base64.b64decode(image.data_base64),
+        # the column already holds raw bytes, so they go straight out
+        content=image.image_data,
         media_type=image.content_type,
     )
