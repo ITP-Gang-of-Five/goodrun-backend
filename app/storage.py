@@ -181,6 +181,17 @@ class Database:
         # returns a list of User objects constructed from the users portion of the JSON database
         return [User(**row) for row in self._read()["users"]]
 
+    def update_user(self, user: User) -> None:
+        data = self._read()
+        for index, row in enumerate(data["users"]):
+            if row["id"] == user.id:
+                # overide the user at this index with the User model parsed in
+                data["users"][index] = json.loads(user.model_dump_json())
+                self._write(data)
+                return
+        # Error if the user doesn't exist
+        raise KeyError(f"user {user.id} does not exist")
+
     """
     ---------
     Location
