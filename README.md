@@ -37,21 +37,6 @@ DATABASE_URL=postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require
 
 `.env` is gitignored, keep it that way, it has the password in it.
 
-Then build the schema and load the fixtures:
-
-```sh
-uv run python scripts/db.py app/schema.sql app/seed.sql
-```
-
-- `app/schema.sql` is the tables, it **drops everything first** so you can re-run it
-  whenever the schema changes
-- `app/seed.sql` is the dev data, one account per role plus a couple of locations, orders
-  and a run in progress
-
-NB: that script is the only thing that writes to your database outside of the app. `make
-check` never touches it, every test runs in a transaction that gets rolled back. So run the
-seed once and then you can run the tests as much as you like.
-
 Logins for the seeded accounts:
 
 | email | password | role |
