@@ -185,11 +185,11 @@ class Database:
         data = self._read()
         for index, row in enumerate(data["users"]):
             if row["id"] == user.id:
-                #overide the user at this index with the User model parsed in
+                # overide the user at this index with the User model parsed in
                 data["users"][index] = json.loads(user.model_dump_json())
                 self._write(data)
                 return
-        #Error if the user doesn't exist
+        # Error if the user doesn't exist
         raise KeyError(f"user {user.id} does not exist")
 
     """
