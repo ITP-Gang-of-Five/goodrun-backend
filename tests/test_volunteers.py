@@ -108,3 +108,37 @@ def test_get_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_admin_can_list_volunteers(client: TestClient) -> None:
+    headers = _auth_headers(client, ADMIN)
+    response = client.get(VOLUNTEERS, headers=headers)
+
+    assert response.status_code == 200
+    volunteers = response.json()["volunteers"]
+    #only volunteers should be listed, never admins or organisations
+    ids = [v["volunteerId"] for v in volunteers]
+    assert str(VOLUNTEER_ID) in ids
+    assert str(ORGANISATION_ID) not in ids
+    tara = next(v for v in volunteers if v["volunteerId"] == str(VOLUNTEER_ID))
+    assert tara["email"] == VOLUNTEER["email"]
+    assert "password" not in tara
+
+
+def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) -> None:
+    #create a new volunteer
+    headers = _auth_headers(client, ADMIN)
+    created = client.post(
+        VOLUNTEERS,
+        json={
+            "name": "New Volunteer",
+            "email": "new.volunteer@example.com",
+            "password": "hunter2",
+            "carSize": "LARGE",
+        },
+        headers=headers,
+    ).json()
+
+    response = client.get(VOLUNTEERS, headers=headers)
+    #our new volunteer should be in there
+    assert created in response.json()["volunteers"]

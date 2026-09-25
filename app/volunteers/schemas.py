@@ -13,6 +13,11 @@ class VolunteerOut(CamelModel):
     created_at: datetime
 
 
+# every volunteer account, wrapped in an object as per the api agreement
+class VolunteersOut(CamelModel):
+    volunteers: list[VolunteerOut]
+
+
 # input for registering a new volunteer account
 class CreateVolunteerRequest(CamelModel):
     name: str
