@@ -116,7 +116,7 @@ def test_admin_can_list_volunteers(client: TestClient) -> None:
 
     assert response.status_code == 200
     volunteers = response.json()["volunteers"]
-    #only volunteers should be listed, never admins or organisations
+    # only volunteers should be listed, never admins or organisations
     ids = [v["volunteerId"] for v in volunteers]
     assert str(VOLUNTEER_ID) in ids
     assert str(ORGANISATION_ID) not in ids
@@ -126,7 +126,7 @@ def test_admin_can_list_volunteers(client: TestClient) -> None:
 
 
 def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) -> None:
-    #create a new volunteer
+    # create a new volunteer
     headers = _auth_headers(client, ADMIN)
     created = client.post(
         VOLUNTEERS,
@@ -140,5 +140,5 @@ def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) ->
     ).json()
 
     response = client.get(VOLUNTEERS, headers=headers)
-    #our new volunteer should be in there
+    # our new volunteer should be in there
     assert created in response.json()["volunteers"]

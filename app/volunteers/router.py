@@ -33,7 +33,7 @@ def _require_volunteer(db: Queries, volunteer_id: int) -> User:
 @router.get("/")
 def list_volunteers(admin: AdminUser, db: QueriesDep) -> VolunteersOut:
     return VolunteersOut(
-        #literally just get all of the users that are volunteers
+        # literally just get all of the users that are volunteers
         volunteers=[
             _volunteer_out(user) for user in db.list_users_by_role(Role.VOLUNTEER)
         ]
