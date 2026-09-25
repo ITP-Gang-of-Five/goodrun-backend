@@ -4,7 +4,11 @@ from fastapi import APIRouter
 
 from app.api.deps import AdminUser
 from app.errors import ApiError
-from app.organisations.schemas import CreateOrganisationRequest, OrganisationOut
+from app.organisations.schemas import (
+    CreateOrganisationRequest,
+    OrganisationOut,
+    OrganisationsResponse,
+)
 from app.queries import Queries, QueriesDep
 from app.storage import Role, User
 
@@ -28,7 +32,19 @@ def _require_organisation(db: Queries, organisation_id: int) -> User:
     return user
 
 
+@router.get("/")
+def list_organisations(admin: AdminUser, db: QueriesDep) -> OrganisationsResponse:
+    #simply return all organisations, admin only of course
+    return OrganisationsResponse(
+        organisations=[
+            _organisation_out(user) for user in db.list_users_by_role(Role.ORGANISATION)
+        ]
+    )
+
+
 # fetch a single organisation's profile
+#TODO: I might have made a mistake in the API agreement, pretty sure that volunteer's are going to need to be able
+#to grab organisations in the future..... we shall return to this later
 @router.get("/{organisation_id}")
 def get_organisation(
     organisation_id: int, admin: AdminUser, db: QueriesDep

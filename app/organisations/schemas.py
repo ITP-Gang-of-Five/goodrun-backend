@@ -16,3 +16,8 @@ class CreateOrganisationRequest(CamelModel):
     name: str
     email: str
     password: str
+
+
+# every organisation, as returned by GET organisations/
+class OrganisationsResponse(CamelModel):
+    organisations: list[OrganisationOut]
