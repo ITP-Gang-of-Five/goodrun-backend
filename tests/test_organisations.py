@@ -1,9 +1,4 @@
-from collections.abc import Iterator
-
-import pytest
 from fastapi.testclient import TestClient
-
-from app.storage import DB_FILE
 
 ORGANISATIONS = "/api/v0/organisations/"
 LOGIN = "/api/v0/auth/login"
@@ -20,16 +15,7 @@ def _auth_headers(client: TestClient, credentials: dict[str, str]) -> dict[str, 
     return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.fixture
-def preserve_db() -> Iterator[None]:
-    original = DB_FILE.read_text()
-    yield
-    DB_FILE.write_text(original)
-
-
-def test_admin_can_create_and_then_get_an_organisation(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_admin_can_create_and_then_get_an_organisation(client: TestClient) -> None:
     headers = _auth_headers(client, ADMIN)
 
     created = client.post(
@@ -55,9 +41,7 @@ def test_admin_can_create_and_then_get_an_organisation(
     assert fetched.json() == body
 
 
-def test_create_organisation_with_taken_email_returns_409(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_create_organisation_with_taken_email_returns_409(client: TestClient) -> None:
     headers = _auth_headers(client, ADMIN)
 
     response = client.post(
@@ -74,9 +58,7 @@ def test_create_organisation_with_taken_email_returns_409(
     assert response.json()["error"]["code"] == "EMAIL_TAKEN"
 
 
-def test_create_organisation_forbidden_for_non_admin(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_create_organisation_forbidden_for_non_admin(client: TestClient) -> None:
     headers = _auth_headers(client, VOLUNTEER)
 
     response = client.post(
@@ -89,9 +71,7 @@ def test_create_organisation_forbidden_for_non_admin(
     assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
-def test_create_organisation_requires_auth(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_create_organisation_requires_auth(client: TestClient) -> None:
     response = client.post(
         ORGANISATIONS,
         json={"name": "New Organisation", "email": "x@example.com", "password": "x"},
@@ -101,9 +81,7 @@ def test_create_organisation_requires_auth(
     assert response.json()["error"]["code"] == "UNAUTHORISED"
 
 
-def test_get_organisation_not_found_for_missing_id(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_get_organisation_not_found_for_missing_id(client: TestClient) -> None:
     headers = _auth_headers(client, ADMIN)
 
     response = client.get(f"{ORGANISATIONS}999999", headers=headers)
@@ -114,7 +92,7 @@ def test_get_organisation_not_found_for_missing_id(
 
 # a user id that exists but belongs to a non-organisation role should 404, not leak their profile
 def test_get_organisation_not_found_for_non_organisation_user(
-    client: TestClient, preserve_db: None
+    client: TestClient,
 ) -> None:
     headers = _auth_headers(client, ADMIN)
 
@@ -124,9 +102,7 @@ def test_get_organisation_not_found_for_non_organisation_user(
     assert response.json()["error"]["code"] == "ORGANISATION_NOT_FOUND"
 
 
-def test_get_organisation_forbidden_for_non_admin(
-    client: TestClient, preserve_db: None
-) -> None:
+def test_get_organisation_forbidden_for_non_admin(client: TestClient) -> None:
     headers = _auth_headers(client, ORGANISATION)
 
     response = client.get(f"{ORGANISATIONS}{ORGANISATION_ID}", headers=headers)
