@@ -6,7 +6,7 @@ from app.api.deps import AdminUser
 from app.errors import ApiError
 from app.queries import Queries, QueriesDep
 from app.storage import Role, User
-from app.volunteers.schemas import CreateVolunteerRequest, VolunteerOut
+from app.volunteers.schemas import CreateVolunteerRequest, VolunteerOut, VolunteersOut
 
 router = APIRouter(prefix="/volunteers", tags=["volunteers"])
 
@@ -27,6 +27,17 @@ def _require_volunteer(db: Queries, volunteer_id: int) -> User:
     if user is None or user.role != Role.VOLUNTEER:
         raise ApiError(404, "VOLUNTEER_NOT_FOUND", "No volunteer with that id")
     return user
+
+
+# fetch every volunteer account
+@router.get("/")
+def list_volunteers(admin: AdminUser, db: QueriesDep) -> VolunteersOut:
+    return VolunteersOut(
+        # literally just get all of the users that are volunteers
+        volunteers=[
+            _volunteer_out(user) for user in db.list_users_by_role(Role.VOLUNTEER)
+        ]
+    )
 
 
 # fetch a single volunteer's profile
