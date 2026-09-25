@@ -65,6 +65,25 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+
+    # The tests need a real Postgres. This is a throwaway one that lives and dies with
+    # the job, so CI never touches Neon and no database credentials go into secrets.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
     steps:
       - uses: actions/checkout@v7
         with:
@@ -81,6 +100,8 @@ jobs:
           enable-cache: true
       - run: uv sync --all-groups --locked
 
+      - name: Set up the database
+        run: uv run python scripts/db.py app/schema.sql app/seed.sql
 
       - name: Run tests
         run: uv run pytest --cov --cov-report=xml --cov-fail-under=0

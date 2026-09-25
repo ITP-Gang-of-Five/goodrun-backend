@@ -3,7 +3,8 @@ from fastapi import APIRouter
 from app.api.deps import CurrentUser
 from app.errors import ApiError
 from app.me.schemas import ProfileOut, UpdateProfileRequest
-from app.storage import Role, get_database
+from app.queries import QueriesDep
+from app.storage import Role
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -22,7 +23,9 @@ def get_my_profile(actor: CurrentUser) -> ProfileOut:
 
 
 @router.patch("/", status_code=204)
-def update_my_profile(body: UpdateProfileRequest, actor: CurrentUser) -> None:
+def update_my_profile(
+    body: UpdateProfileRequest, actor: CurrentUser, queries: QueriesDep
+) -> None:
     # you can't change car_size for non-volunteers because they dont have that
     if "car_size" in body.model_fields_set and actor.role != Role.VOLUNTEER:
         raise ApiError(403, "FORBIDDEN", "Only volunteers can set a car size")
@@ -35,4 +38,9 @@ def update_my_profile(body: UpdateProfileRequest, actor: CurrentUser) -> None:
     # copy the actor and update it with these changed fields
     updated = actor.model_copy(update=changes)
     # update the user in the database
-    get_database().update_user(updated)
+    queries.update_user(updated)
+
+    # car_size is not a column on users any more, it lives in volunteer_preferences,
+    # so update_user above does not touch it and it needs its own write
+    if changes.get("car_size") is not None:
+        queries.set_car_size(actor.id, changes["car_size"])

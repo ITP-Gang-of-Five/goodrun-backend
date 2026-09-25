@@ -1,9 +1,4 @@
-from collections.abc import Iterator
-
-import pytest
 from fastapi.testclient import TestClient
-
-from app.storage import DB_FILE
 
 ME = "/api/v0/me/"
 LOGIN = "/api/v0/auth/login"
@@ -17,14 +12,6 @@ VOLUNTEER = {"email": "tara@example.com", "password": "volunteer"}
 def _auth_headers(client: TestClient, credentials: dict[str, str]) -> dict[str, str]:
     token = client.post(LOGIN, json=credentials).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
-
-
-# copied from test_orders
-@pytest.fixture
-def preserve_db() -> Iterator[None]:
-    original = DB_FILE.read_text()
-    yield
-    DB_FILE.write_text(original)
 
 
 def test_get_my_profile_returns_the_calling_users_details(client: TestClient) -> None:
@@ -43,7 +30,7 @@ def test_get_my_profile_returns_the_calling_users_details(client: TestClient) ->
 
 
 def test_update_my_profile_changes_only_the_fields_sent(
-    client: TestClient, preserve_db: None
+    client: TestClient,
 ) -> None:
     headers = _auth_headers(client, VOLUNTEER)
 
