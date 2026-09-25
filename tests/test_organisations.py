@@ -112,12 +112,12 @@ def test_get_organisation_forbidden_for_non_admin(client: TestClient) -> None:
 
 
 def test_admin_can_list_organisations(client: TestClient) -> None:
-    #retrieve all organisations
+    # retrieve all organisations
     headers = _auth_headers(client, ADMIN)
     response = client.get(ORGANISATIONS, headers=headers)
 
     assert response.status_code == 200
     organisations = response.json()["organisations"]
     ids = [org["organisationId"] for org in organisations]
-    #ensure that only orgs are returned
+    # ensure that only orgs are returned
     assert ids == [str(ORGANISATION_ID)]
