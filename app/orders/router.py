@@ -81,7 +81,7 @@ Returns a UserRef for a user based on their id
 """
 
 
-def _user_ref(db: Queries, user_id: int) -> UserRef:
+def user_ref(db: Queries, user_id: int) -> UserRef:
     user = db.get_user(user_id)
     return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
 
@@ -91,8 +91,8 @@ Returns a UserRef or none if userId is none. just a helpful wrapper
 """
 
 
-def _optional_user_ref(db: Queries, user_id: int | None) -> UserRef | None:
-    return None if user_id is None else _user_ref(db, user_id)
+def _optionaluser_ref(db: Queries, user_id: int | None) -> UserRef | None:
+    return None if user_id is None else user_ref(db, user_id)
 
 
 """
@@ -112,7 +112,7 @@ a run yet (and thus isn't assigned to a volunteer)
 
 def _volunteer_ref(db: Queries, order: Order) -> UserRef | None:
     run = _order_run(db, order)
-    return _optional_user_ref(db, run.volunteer_id if run else None)
+    return _optionaluser_ref(db, run.volunteer_id if run else None)
 
 
 """
@@ -130,13 +130,13 @@ def _order_fields(db: Queries, order: Order) -> dict[str, object]:
         "urgency": order.urgency,
         "from_": _location_fields(db, order.from_location_id),
         "to": _location_fields(db, order.to_location_id),
-        "from_organisation": _optional_user_ref(db, order.from_organisation_id),
-        "to_organisation": _optional_user_ref(db, order.to_organisation_id),
+        "from_organisation": _optionaluser_ref(db, order.from_organisation_id),
+        "to_organisation": _optionaluser_ref(db, order.to_organisation_id),
         "volunteer": _volunteer_ref(db, order),
         "due_at": order.due_at,
         "pickup_notes": order.pickup_notes,
         "dropoff_notes": order.dropoff_notes,
-        "created_by": _user_ref(db, order.created_by_id),
+        "created_by": user_ref(db, order.created_by_id),
         "created_at": order.created_at,
     }
 
@@ -146,7 +146,7 @@ Converts a stored order into an OrderOut (an order object for response)
 """
 
 
-def _order_out(db: Queries, order: Order) -> OrderOut:
+def order_out(db: Queries, order: Order) -> OrderOut:
     return OrderOut(**_order_fields(db, order))
 
 
@@ -221,7 +221,7 @@ def get_available_orders(volunteer: VolunteerUser, db: QueriesDep) -> OrdersResp
         key=lambda order: (-_URGENCY_RANK[order.urgency], order.created_at, order.id),
     )
     # convert all of the orders into OrderOut objects
-    orders_out = [_order_out(db, order) for order in fitting]
+    orders_out = [order_out(db, order) for order in fitting]
     return OrdersResponse(orders=orders_out)
 
 
@@ -291,7 +291,7 @@ def get_orders(
     # set the page based on our defined offset and limit, allowing for pagination
     page = matching[offset : offset + limit]
     return OrdersResponse(
-        orders=[_order_out(db, order) for order in page], total=len(matching)
+        orders=[order_out(db, order) for order in page], total=len(matching)
     )
 
 
@@ -431,7 +431,7 @@ def track_order(
 
     # construct and return a tracking response
     return TrackingResponse(
-        volunteer=_user_ref(db, run.volunteer_id),
+        volunteer=user_ref(db, run.volunteer_id),
         latitude=position.latitude,
         longitude=position.longitude,
         updated_at=position.updated_at,
