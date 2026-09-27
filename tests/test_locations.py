@@ -18,7 +18,7 @@ def test_admin_can_list_locations(client: TestClient) -> None:
     response = client.get(LOCATIONS, headers=headers)
 
     assert response.status_code == 200
-    #the seed db has the hospital, and every location has the agreement's fields
+    # the seed db has the hospital, and every location has the agreement's fields
     locations = response.json()["locations"]
     assert "Royal Melbourne Hospital" in [location["name"] for location in locations]
     assert set(locations[0]) == {"locationId", "name", "latitude", "longitude"}
