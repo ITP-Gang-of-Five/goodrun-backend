@@ -4,8 +4,9 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Response
 
 from app.api.deps import AdminOrVolunteerUser, AdminUser, VolunteerUser
+from app.common.users import user_ref
 from app.errors import ApiError
-from app.orders.router import order_out, user_ref
+from app.orders.serializers import order_out
 from app.queries import Queries, QueriesDep
 from app.runs.schemas import CreateRunRequest, RunIdResponse, RunOut, RunsResponse
 from app.storage import CarSize, OrderEvent, OrderStatus, Role, Run, RunStatus, User

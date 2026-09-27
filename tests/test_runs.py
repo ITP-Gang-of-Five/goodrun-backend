@@ -113,3 +113,20 @@ def test_get_runs_forbidden_for_organisation(client: TestClient) -> None:
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_create_run_without_a_car_size_returns_order_too_large(client: TestClient) -> None:
+    # a volunteer created without a car size can't build a run until they set one
+    client.post(
+        "/api/v0/volunteers/",
+        json={"name": "No Car", "email": "no.car@example.com", "password": "hunter22"},
+        headers=_auth_headers(client, ADMIN),
+    )
+    headers = _auth_headers(
+        client, {"email": "no.car@example.com", "password": "hunter22"}
+    )
+
+    response = client.post(RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "ORDER_TOO_LARGE"
