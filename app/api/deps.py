@@ -68,3 +68,6 @@ VolunteerUser = Annotated[User, Depends(require_role(Role.VOLUNTEER))]
 AdminOrOrganisationUser = Annotated[
     User, Depends(require_role(Role.ADMIN, Role.ORGANISATION))
 ]
+AdminOrVolunteerUser = Annotated[
+    User, Depends(require_role(Role.ADMIN, Role.VOLUNTEER))
+]

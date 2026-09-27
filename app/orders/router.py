@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Response
 
 from app.api.deps import AdminOrOrganisationUser, AdminUser, CurrentUser, VolunteerUser
-from app.common.schemas import UserRef
+from app.common.users import user_ref
 from app.errors import ApiError
 from app.orders.schemas import (
     CreateOrderRequest,
@@ -14,11 +14,11 @@ from app.orders.schemas import (
     OrderEventOut,
     OrderIdResponse,
     OrderImageOut,
-    OrderOut,
     OrdersResponse,
     TrackingResponse,
     UploadImageRequest,
 )
+from app.orders.serializers import order_fields, order_out, order_run
 from app.queries import Queries, QueriesDep
 from app.storage import (
     CarSize,
@@ -27,7 +27,6 @@ from app.storage import (
     OrderImage,
     OrderStatus,
     Role,
-    Run,
     RunStatus,
     Urgency,
     User,
@@ -63,93 +62,6 @@ def _fits(car_size: CarSize | None, order_size: CarSize) -> bool:
     )
 
 
-# returns a dictionary of the fields for a location object
-def _location_fields(db: Queries, location_id: int) -> dict[str, object]:
-    location = db.get_location(location_id)
-    # orders only ever store location ids that were validated to exist at creation time
-    assert location is not None
-    return {
-        "location_id": str(location.id),
-        "name": location.name,
-        "latitude": location.latitude,
-        "longitude": location.longitude,
-    }
-
-
-"""
-Returns a UserRef for a user based on their id
-"""
-
-
-def _user_ref(db: Queries, user_id: int) -> UserRef:
-    user = db.get_user(user_id)
-    return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
-
-
-"""
-Returns a UserRef or none if userId is none. just a helpful wrapper
-"""
-
-
-def _optional_user_ref(db: Queries, user_id: int | None) -> UserRef | None:
-    return None if user_id is None else _user_ref(db, user_id)
-
-
-"""
-Returns the Run an order is on, or None if it isn't assigned to one yet
-"""
-
-
-def _order_run(db: Queries, order: Order) -> Run | None:
-    return db.get_run(order.run_id) if order.run_id is not None else None
-
-
-"""
-Returns a UserRef for the volunteer assigned to an order or None if the order isn't on
-a run yet (and thus isn't assigned to a volunteer)
-"""
-
-
-def _volunteer_ref(db: Queries, order: Order) -> UserRef | None:
-    run = _order_run(db, order)
-    return _optional_user_ref(db, run.volunteer_id if run else None)
-
-
-"""
-converts an order from a database entry into a dictionary for use
-"""
-
-
-def _order_fields(db: Queries, order: Order) -> dict[str, object]:
-    return {
-        "order_id": str(order.id),
-        "run_id": str(order.run_id) if order.run_id is not None else None,
-        "size": order.size,
-        "description": order.description,
-        "status": order.status,
-        "urgency": order.urgency,
-        "from_": _location_fields(db, order.from_location_id),
-        "to": _location_fields(db, order.to_location_id),
-        "from_organisation": _optional_user_ref(db, order.from_organisation_id),
-        "to_organisation": _optional_user_ref(db, order.to_organisation_id),
-        "volunteer": _volunteer_ref(db, order),
-        "due_at": order.due_at,
-        "pickup_notes": order.pickup_notes,
-        "dropoff_notes": order.dropoff_notes,
-        "created_by": _user_ref(db, order.created_by_id),
-        "created_at": order.created_at,
-    }
-
-
-"""
-Converts a stored order into an OrderOut (an order object for response)
-"""
-
-
-def _order_out(db: Queries, order: Order) -> OrderOut:
-    return OrderOut(**_order_fields(db, order))
-
-
 """
 A helper function for who is allowed to view this order. If its any admin they are allowed to.
 If its an organisation, they can only view it if they are the 'to' or 'from' organisation
@@ -161,7 +73,7 @@ def _can_view(db: Queries, actor: User, order: Order) -> bool:
         return True
     if actor.role == Role.ORGANISATION:
         return actor.id in (order.from_organisation_id, order.to_organisation_id)
-    run = _order_run(db, order)
+    run = order_run(db, order)
     return run is not None and run.volunteer_id == actor.id
 
 
@@ -221,7 +133,7 @@ def get_available_orders(volunteer: VolunteerUser, db: QueriesDep) -> OrdersResp
         key=lambda order: (-_URGENCY_RANK[order.urgency], order.created_at, order.id),
     )
     # convert all of the orders into OrderOut objects
-    orders_out = [_order_out(db, order) for order in fitting]
+    orders_out = [order_out(db, order) for order in fitting]
     return OrdersResponse(orders=orders_out)
 
 
@@ -291,7 +203,7 @@ def get_orders(
     # set the page based on our defined offset and limit, allowing for pagination
     page = matching[offset : offset + limit]
     return OrdersResponse(
-        orders=[_order_out(db, order) for order in page], total=len(matching)
+        orders=[order_out(db, order) for order in page], total=len(matching)
     )
 
 
@@ -378,9 +290,9 @@ def get_order(order_id: int, actor: CurrentUser, db: QueriesDep) -> OrderDetailO
             OrderImageOut(image_id=str(image.id), created_at=image.created_at)
         )
 
-    order_fields = _order_fields(db, order)
+    fields = order_fields(db, order)
     # use these kwards plus the list of events and list of images to consturct the OrderDetailOut (response object)
-    return OrderDetailOut(**order_fields, events=events, images=images)
+    return OrderDetailOut(**fields, events=events, images=images)
 
 
 """
@@ -417,7 +329,7 @@ def track_order(
     order = _require_order(db, actor, order_id)
 
     # an order cannot have tracking if its not part of a run
-    run = _order_run(db, order)
+    run = order_run(db, order)
     # it must also be in progress (an IN_PROGRESS run always has a volunteer assigned)
     if run is None or run.status != RunStatus.IN_PROGRESS or run.volunteer_id is None:
         raise ApiError(409, "RUN_NOT_IN_PROGRESS", "The order's run is not in progress")
@@ -431,7 +343,7 @@ def track_order(
 
     # construct and return a tracking response
     return TrackingResponse(
-        volunteer=_user_ref(db, run.volunteer_id),
+        volunteer=user_ref(db, run.volunteer_id),
         latitude=position.latitude,
         longitude=position.longitude,
         updated_at=position.updated_at,
@@ -450,7 +362,7 @@ def upload_order_image(
     order = _require_order(db, volunteer, order_id)
 
     # image can only be uploaded to an in progress run
-    run = _order_run(db, order)
+    run = order_run(db, order)
     if run is None or run.status != RunStatus.IN_PROGRESS:
         raise ApiError(
             409,
