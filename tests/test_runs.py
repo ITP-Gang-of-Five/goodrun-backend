@@ -23,7 +23,9 @@ def _auth_headers(client: TestClient, credentials: dict[str, str]) -> dict[str, 
 def test_volunteer_can_create_a_run_from_an_available_order(client: TestClient) -> None:
     headers = _auth_headers(client, VOLUNTEER)
 
-    created = client.post(RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers)
+    created = client.post(
+        RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers
+    )
     assert created.status_code == 201
     run_id = created.json()["runId"]
 
@@ -44,7 +46,9 @@ def test_create_run_with_no_orders_returns_400(client: TestClient) -> None:
 def test_create_run_with_already_taken_order_returns_409(client: TestClient) -> None:
     headers = _auth_headers(client, VOLUNTEER)
 
-    response = client.post(RUNS, json={"orderIds": [ALREADY_TAKEN_ORDER_ID]}, headers=headers)
+    response = client.post(
+        RUNS, json={"orderIds": [ALREADY_TAKEN_ORDER_ID]}, headers=headers
+    )
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "ORDER_ALREADY_TAKEN"
@@ -65,7 +69,9 @@ def test_get_current_runs_includes_the_volunteers_in_progress_run(
 def test_cancel_run_returns_its_order_to_the_available_pool(client: TestClient) -> None:
     headers = _auth_headers(client, VOLUNTEER)
     admin_headers = _auth_headers(client, ADMIN)
-    run_id = client.post(RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers).json()["runId"]
+    run_id = client.post(
+        RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers
+    ).json()["runId"]
 
     cancelled = client.post(f"{RUNS}{run_id}/cancel", headers=headers)
     assert cancelled.status_code == 204
@@ -79,7 +85,9 @@ def test_cancel_run_returns_its_order_to_the_available_pool(client: TestClient) 
 
 def test_complete_run_marks_its_order_delivered(client: TestClient) -> None:
     headers = _auth_headers(client, VOLUNTEER)
-    run_id = client.post(RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers).json()["runId"]
+    run_id = client.post(
+        RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers
+    ).json()["runId"]
 
     completed = client.post(f"{RUNS}{run_id}/complete", headers=headers)
     assert completed.status_code == 204
@@ -100,7 +108,9 @@ def test_admin_can_remove_a_run_without_returning_orders_to_the_pool(
     removed = client.post(f"{RUNS}{run_id}/remove", headers=admin_headers)
     assert removed.status_code == 204
 
-    order = client.get(f"{ORDERS}{AVAILABLE_ORDER_ID}", headers=volunteer_headers).json()
+    order = client.get(
+        f"{ORDERS}{AVAILABLE_ORDER_ID}", headers=volunteer_headers
+    ).json()
     assert order["status"] == "CANCELLED"
     available = client.get(f"{ORDERS}available", headers=volunteer_headers).json()
     assert order["orderId"] not in [o["orderId"] for o in available["orders"]]
@@ -115,7 +125,9 @@ def test_get_runs_forbidden_for_organisation(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
-def test_create_run_without_a_car_size_returns_order_too_large(client: TestClient) -> None:
+def test_create_run_without_a_car_size_returns_order_too_large(
+    client: TestClient,
+) -> None:
     # a volunteer created without a car size can't build a run until they set one
     client.post(
         "/api/v0/volunteers/",
@@ -126,7 +138,9 @@ def test_create_run_without_a_car_size_returns_order_too_large(client: TestClien
         client, {"email": "no.car@example.com", "password": "hunter22"}
     )
 
-    response = client.post(RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers)
+    response = client.post(
+        RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=headers
+    )
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "ORDER_TOO_LARGE"

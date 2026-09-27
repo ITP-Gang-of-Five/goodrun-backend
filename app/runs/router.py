@@ -35,7 +35,9 @@ def _run_out(db: Queries, run: Run) -> RunOut:
 
 def _record_event(db: Queries, order_id: int, status: OrderStatus) -> None:
     db.add_order_event(
-        OrderEvent(id=0, order_id=order_id, new_status=status, created_at=datetime.now(UTC))
+        OrderEvent(
+            id=0, order_id=order_id, new_status=status, created_at=datetime.now(UTC)
+        )
     )
 
 
