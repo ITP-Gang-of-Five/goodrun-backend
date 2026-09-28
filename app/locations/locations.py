@@ -15,6 +15,8 @@ JsonDict = dict[str, Any]
 AWS_PLACES_URL = "https://places.geo.ap-southeast-2.amazonaws.com/v2"
 _TIMEOUT = 20
 
+# suggest wont run without a bias position, bounding box or circle, so we give it the cbd.
+# its only a bias though, somewhere regional still comes back, just ranked lower
 MELBOURNE = [144.9631, -37.8136]
 
 _session = requests.Session()
@@ -53,6 +55,8 @@ def _request(
     except requests.RequestException as error:
         status = error.response.status_code if error.response is not None else None
 
+        # aws says 400 for an id it doesnt recognise rather than 404. only the place
+        # lookup opts into this, a 400 from suggest or geocode means our body is wrong
         if bad_request_is_not_found and status == 400:
             raise ApiError(
                 404, "ADDRESS_NOT_FOUND", "That suggestion could not be resolved"
@@ -102,6 +106,8 @@ def suggest(query: str) -> list[LocationSuggestionOut]:
         ) from error
 
 
+# nothing calls this, we use suggest instead because autocomplete only matches addresses
+# and gives you nothing for a place name or a typo. leaving it here in case we swap back
 def autocomplete(query: str) -> list[LocationSuggestionOut]:
     data = _request(
         "autocomplete",
@@ -178,6 +184,7 @@ def resolve_location(
 
 def _parse_aws_location(data: JsonDict) -> ResolvedLocationOut:
     try:
+        # aws gives Position as [longitude, latitude], not the other way round
         position = data["Position"]
         address = data.get("Address", {}).get("Label") or data["Title"]
 
