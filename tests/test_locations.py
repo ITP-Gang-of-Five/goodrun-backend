@@ -114,6 +114,61 @@ def test_autocomplete_returns_suggestions(
     }
 
 
+def test_admin_can_create_a_location_from_an_address(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_aws(monkeypatch, GEOCODE_RESULT)
+    headers = _auth_headers(client, ADMIN)
+
+    created = client.post(
+        LOCATIONS,
+        json={"name": "Royal Melbourne Hospital", "address": "300 Grattan St"},
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    location_id = created.json()["locationId"]
+
+    listed = client.get(LOCATIONS, headers=headers)
+    saved = [x for x in listed.json()["locations"] if x["locationId"] == location_id]
+    # the name is ours, the coordinates come from aws, the address is not stored
+    assert saved == [
+        {
+            "locationId": location_id,
+            "name": "Royal Melbourne Hospital",
+            "latitude": -37.799572,
+            "longitude": 144.956776,
+        }
+    ]
+
+
+def test_create_location_with_an_unresolvable_address_is_not_found(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_aws(monkeypatch, {"ResultItems": []})
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.post(
+        LOCATIONS,
+        json={"name": "Nowhere", "address": "nowhere at all"},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "ADDRESS_NOT_FOUND"
+
+
+def test_create_location_requires_exactly_one_location_input(
+    client: TestClient,
+) -> None:
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.post(LOCATIONS, json={"name": "Nowhere"}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_geocode_requires_a_parameter(client: TestClient) -> None:
     headers = _auth_headers(client, ADMIN)
 
@@ -165,4 +220,4 @@ def test_geocode_with_no_results_is_not_found(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "LOCATION_NOT_FOUND"
+    assert response.json()["error"]["code"] == "ADDRESS_NOT_FOUND"

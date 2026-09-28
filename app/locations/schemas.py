@@ -27,3 +27,13 @@ class ResolvedLocationOut(CamelModel):
     address: str
     latitude: float
     longitude: float
+
+
+class CreateLocationRequest(CamelModel):
+    name: str
+    suggestion_id: str | None = None
+    address: str | None = None
+
+
+class LocationIdResponse(CamelModel):
+    location_id: str

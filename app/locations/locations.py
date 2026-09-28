@@ -35,6 +35,7 @@ def _request(
     path: str,
     params: JsonDict | None = None,
     body: JsonDict | None = None,
+    bad_request_is_not_found: bool = False,
 ) -> JsonDict:
     query: JsonDict = {"key": _get_api_key()}
     if params:
@@ -50,6 +51,13 @@ def _request(
         response.raise_for_status()
         return response.json()
     except requests.RequestException as error:
+        status = error.response.status_code if error.response is not None else None
+
+        if bad_request_is_not_found and status == 400:
+            raise ApiError(
+                404, "ADDRESS_NOT_FOUND", "That suggestion could not be resolved"
+            ) from error
+
         endpoint = path.split("/")[0]
         raise ApiError(
             502, "LOCATION_LOOKUP_FAILED", f"AWS {endpoint} request failed"
@@ -121,29 +129,30 @@ def autocomplete(query: str) -> list[LocationSuggestionOut]:
         ) from error
 
 
-def get_place(suggestion_id: str) -> ResolvedLocationOut:
+def get_place(suggestion_id: str, storage: bool = False) -> ResolvedLocationOut:
     data = _request(
         f"place/{quote(suggestion_id, safe='')}",
-        params={"intended-use": "SingleUse"},
+        params={"intended-use": "Storage" if storage else "SingleUse"},
+        bad_request_is_not_found=True,
     )
 
     return _parse_aws_location(data)
 
 
-def geocode(address: str) -> ResolvedLocationOut:
+def geocode(address: str, storage: bool = False) -> ResolvedLocationOut:
     data = _request(
         "geocode",
         body={
             "QueryText": address,
             "MaxResults": 1,
             "Filter": {"IncludeCountries": ["AUS"]},
-            "IntendedUse": "SingleUse",
+            "IntendedUse": "Storage" if storage else "SingleUse",
         },
     )
 
     results = data.get("ResultItems") or []
     if not results:
-        raise ApiError(404, "LOCATION_NOT_FOUND", "No location found for that address")
+        raise ApiError(404, "ADDRESS_NOT_FOUND", "No location found for that address")
 
     return _parse_aws_location(results[0])
 
@@ -151,6 +160,7 @@ def geocode(address: str) -> ResolvedLocationOut:
 def resolve_location(
     suggestion_id: str | None = None,
     address: str | None = None,
+    storage: bool = False,
 ) -> ResolvedLocationOut:
     if suggestion_id and address:
         raise ApiError(
@@ -158,10 +168,10 @@ def resolve_location(
         )
 
     if suggestion_id:
-        return get_place(suggestion_id)
+        return get_place(suggestion_id, storage)
 
     if address:
-        return geocode(address)
+        return geocode(address, storage)
 
     raise ApiError(422, "VALIDATION_ERROR", "Provide either suggestionId or address")
 

@@ -5,12 +5,15 @@ from fastapi import APIRouter, Query
 from app.api.deps import AdminUser
 from app.locations import locations
 from app.locations.schemas import (
+    CreateLocationRequest,
+    LocationIdResponse,
     LocationOut,
     LocationsResponse,
     LocationSuggestionsResponse,
     ResolvedLocationOut,
 )
 from app.queries import QueriesDep
+from app.storage import Location
 
 router = APIRouter(prefix="/locations", tags=["locations"])
 
@@ -30,6 +33,27 @@ def list_locations(admin: AdminUser, db: QueriesDep) -> LocationsResponse:
             for location in db.list_locations()
         ]
     )
+
+
+@router.post("/", status_code=201)
+def create_location(
+    body: CreateLocationRequest, admin: AdminUser, db: QueriesDep
+) -> LocationIdResponse:
+    resolved = locations.resolve_location(
+        suggestion_id=body.suggestion_id,
+        address=body.address,
+        storage=True,
+    )
+
+    location = db.add_location(
+        Location(
+            id=0,
+            name=body.name,
+            latitude=resolved.latitude,
+            longitude=resolved.longitude,
+        )
+    )
+    return LocationIdResponse(location_id=str(location.id))
 
 
 @router.get("/autocomplete")
