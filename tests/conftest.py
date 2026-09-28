@@ -1,12 +1,31 @@
 from collections.abc import Iterator
+from typing import Any, NoReturn
 
 import psycopg
 import pytest
+import requests
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
 from app.main import app
 from app.queries import DATABASE_URL, Queries, get_queries
+
+
+@pytest.fixture(autouse=True)
+def no_real_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Stops any test from actually calling out to AWS, which costs money per request.
+
+    Tests that need a location response fake it with _fake_aws in test_locations.py.
+    If you see this error, that is what you are missing.
+    """
+
+    def refuse(*args: Any, **kwargs: Any) -> NoReturn:
+        raise RuntimeError(
+            "this test tried to make a real http request, use _fake_aws instead"
+        )
+
+    monkeypatch.setattr(requests.Session, "request", refuse)
 
 
 @pytest.fixture
