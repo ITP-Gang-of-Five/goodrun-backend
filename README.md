@@ -49,6 +49,22 @@ NB: passwords are still plain text in the `password_hash` column. The column is 
 where this is going, hashing is a separate job.
 
 
+# Locations
+
+Anything under `/api/v0/locations/` talks to AWS Location Service, so you need a key for
+those to work. It goes in the same `.env`:
+
+```
+AWS_LOCATION_KEY=your-key-here
+```
+
+Without it those endpoints give you a 500 and everything else still works, so if locations
+are the only thing broken thats probably why.
+
+The tests dont need a key, they fake the AWS responses, which is also why CI can run them
+without one. Just dont remove that faking or every test run starts costing us money.
+
+
 # Helpful Coding Practices
 
 If your using VS CODE I highly reccomend that you install the Python extension. You can then click command shift p or ctrl shift p and 

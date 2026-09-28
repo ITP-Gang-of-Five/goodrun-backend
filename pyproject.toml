@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.141.1",
     "psycopg[binary,pool]>=3.3.6",
     "pyjwt>=2.14.0",
+    "requests>=2.34.2",
 ]
 
 [dependency-groups]
