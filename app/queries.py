@@ -22,6 +22,7 @@ from app.storage import (
     Role,
     Run,
     RunStatus,
+    Urgency,
     User,
     VolunteerLocation,
 )
@@ -128,6 +129,15 @@ class Queries:
         ).fetchone()
         return User(**row) if row else None
 
+    def get_users(self, user_ids: set[int]) -> dict[int, User]:
+        # fetch MULTIPLE users
+        if not user_ids:
+            return {}
+        rows = self._connection.execute(
+            f"SELECT {_USER_COLUMNS} WHERE u.user_id = ANY(%s)", (list(user_ids),)
+        ).fetchall()
+        return {row["id"]: User(**row) for row in rows}
+
     def get_user_by_email(self, email: str) -> User | None:
         # The API agreement says emails are compared ignoring case and surrounding
         # spaces, so both sides get trimmed and lowered
@@ -227,6 +237,16 @@ class Queries:
         ).fetchone()
         return Location(**row) if row else None
 
+    def get_locations(self, location_ids: set[int]) -> dict[int, Location]:
+        # fetch MULTIPLE locations
+        if not location_ids:
+            return {}
+        rows = self._connection.execute(
+            f"SELECT {_LOCATION_COLUMNS} WHERE location_id = ANY(%s)",
+            (list(location_ids),),
+        ).fetchall()
+        return {row["id"]: Location(**row) for row in rows}
+
     def list_locations(self) -> list[Location]:
         rows = self._connection.execute(
             f"SELECT {_LOCATION_COLUMNS} ORDER BY location_id"
@@ -257,6 +277,15 @@ class Queries:
             f"SELECT {_RUN_COLUMNS} WHERE run_id = %s", (run_id,)
         ).fetchone()
         return Run(**row) if row else None
+
+    def get_runs(self, run_ids: set[int]) -> dict[int, Run]:
+        # fetch MULTIPLE runs
+        if not run_ids:
+            return {}
+        rows = self._connection.execute(
+            f"SELECT {_RUN_COLUMNS} WHERE run_id = ANY(%s)", (list(run_ids),)
+        ).fetchall()
+        return {row["id"]: Run(**row) for row in rows}
 
     def list_runs(self) -> list[Run]:
         rows = self._connection.execute(
@@ -342,6 +371,70 @@ class Queries:
             (run_id,),
         ).fetchall()
         return [Order(**row) for row in rows]
+
+    def list_orders_for_runs(self, run_ids: list[int]) -> list[Order]:
+        # same as list_orders_for_run but does it for multiple runs in a single query
+        if not run_ids:
+            return []
+        rows = self._connection.execute(
+            f"""SELECT {_ORDER_COLUMNS}
+            WHERE run_id = ANY(%s)
+            ORDER BY run_id, sequence NULLS LAST, order_id""",
+            (run_ids,),
+        ).fetchall()
+        return [Order(**row) for row in rows]
+
+    def search_orders(
+        self,
+        *,
+        status: OrderStatus | None,
+        size: CarSize | None,
+        urgency: Urgency | None,
+        organisation_id: int | None,
+        volunteer_id: int | None,
+        unassigned: bool,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[Order], int]:
+        """
+        GET orders/ with all filters done in the database (MUCH faster).
+
+        NB: each filter is skipped when its value is None
+
+        organisationId matches either end of the order (to/from)
+        volunteerId matches on any of that volunteer's runs
+        """
+        where = """
+            WHERE (%(status)s::text IS NULL OR status = %(status)s)
+              AND (%(size)s::text IS NULL OR size = %(size)s)
+              AND (%(urgency)s::text IS NULL OR urgency = %(urgency)s)
+              AND (%(organisation_id)s::int IS NULL
+                   OR %(organisation_id)s IN (from_organisation_id, to_organisation_id))
+              AND (%(volunteer_id)s::int IS NULL OR run_id IN (
+                   SELECT run_id FROM runs WHERE volunteer_id = %(volunteer_id)s))
+              AND (NOT %(unassigned)s OR run_id IS NULL)
+        """
+        params = {
+            "status": status,
+            "size": size,
+            "urgency": urgency,
+            "organisation_id": organisation_id,
+            "volunteer_id": volunteer_id,
+            "unassigned": unassigned,
+            "limit": limit,
+            "offset": offset,
+        }
+        rows = self._connection.execute(
+            f"""SELECT {_ORDER_COLUMNS} {where}
+            ORDER BY created_at DESC, order_id DESC
+            LIMIT %(limit)s OFFSET %(offset)s""",
+            params,
+        ).fetchall()
+        count = self._connection.execute(
+            f"SELECT count(*) AS total FROM orders {where}", params
+        ).fetchone()
+        assert count is not None
+        return [Order(**row) for row in rows], count["total"]
 
     def list_available_orders(self, car_size: CarSize | None) -> list[Order]:
         """

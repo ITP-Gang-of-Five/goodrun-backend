@@ -5,6 +5,7 @@ to show a user as { userId, name } should use these instead of building UserRefs
 
 from app.common.schemas import UserRef
 from app.queries import Queries
+from app.storage import User
 
 """
 Returns a UserRef for a user based on their id
@@ -23,3 +24,15 @@ Returns a UserRef or none if userId is none. just a helpful wrapper
 
 def optional_user_ref(db: Queries, user_id: int | None) -> UserRef | None:
     return None if user_id is None else user_ref(db, user_id)
+
+
+"""
+Same as user_ref, but using users that were already fetched in bulk (see Queries.get_users),
+"""
+
+
+def user_ref_from(users: dict[int, User], user_id: int | None) -> UserRef | None:
+    if user_id is None:
+        return None
+    user = users.get(user_id)
+    return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")

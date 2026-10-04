@@ -1,12 +1,14 @@
+from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Response
 
 from app.api.deps import AdminOrVolunteerUser, AdminUser, VolunteerUser
-from app.common.users import user_ref
+from app.common.users import user_ref_from
 from app.errors import ApiError
-from app.orders.serializers import order_out
+from app.orders.schemas import OrderOut
+from app.orders.serializers import orders_out
 from app.queries import Queries, QueriesDep
 from app.runs.schemas import CreateRunRequest, RunIdResponse, RunOut, RunsResponse
 from app.storage import CarSize, OrderEvent, OrderStatus, Role, Run, RunStatus, User
@@ -21,16 +23,33 @@ HELPER FUNCTIONS
 """
 
 
+# converts multiple runs into RunOuts fetching all orders and volunteers in bulk
+def _runs_out(db: Queries, runs: list[Run]) -> list[RunOut]:
+    orders = db.list_orders_for_runs([run.id for run in runs])
+
+    # group orders by the run they are in
+    orders_by_run: dict[int, list[OrderOut]] = defaultdict(list)
+    for order, out in zip(orders, orders_out(db, orders), strict=True):
+        assert order.run_id is not None
+        orders_by_run[order.run_id].append(out)
+
+    volunteers = db.get_users({run.volunteer_id for run in runs if run.volunteer_id})
+    return [
+        RunOut(
+            run_id=str(run.id),
+            status=run.status,
+            volunteer=user_ref_from(volunteers, run.volunteer_id),
+            created_at=run.created_at,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            orders=orders_by_run[run.id],
+        )
+        for run in runs
+    ]
+
+
 def _run_out(db: Queries, run: Run) -> RunOut:
-    return RunOut(
-        run_id=str(run.id),
-        status=run.status,
-        volunteer=user_ref(db, run.volunteer_id),
-        created_at=run.created_at,
-        started_at=run.started_at,
-        completed_at=run.completed_at,
-        orders=[order_out(db, order) for order in db.list_orders_for_run(run.id)],
-    )
+    return _runs_out(db, [run])[0]
 
 
 def _record_event(db: Queries, order_id: int, status: OrderStatus) -> None:
@@ -92,13 +111,13 @@ def get_runs(
     else:
         runs = db.list_runs()
 
-    return RunsResponse(runs=[_run_out(db, run) for run in runs])
+    return RunsResponse(runs=_runs_out(db, runs))
 
 
 @router.get("/current")
 def get_current_runs(volunteer: VolunteerUser, db: QueriesDep) -> RunsResponse:
     runs = db.list_runs_for_volunteer(volunteer.id, RunStatus.IN_PROGRESS)
-    return RunsResponse(runs=[_run_out(db, run) for run in runs])
+    return RunsResponse(runs=_runs_out(db, runs))
 
 
 @router.get("/{run_id}")

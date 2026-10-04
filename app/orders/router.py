@@ -18,7 +18,7 @@ from app.orders.schemas import (
     TrackingResponse,
     UploadImageRequest,
 )
-from app.orders.serializers import order_fields, order_out, order_run
+from app.orders.serializers import order_fields, order_run, orders_out
 from app.queries import Queries, QueriesDep
 from app.storage import (
     CarSize,
@@ -120,21 +120,9 @@ Returns an OrdersResponse for the current Volunteer containing the list of avail
 
 @router.get("/available")
 def get_available_orders(volunteer: VolunteerUser, db: QueriesDep) -> OrdersResponse:
-
-    # retrieve all orders with the ready for pickup status
-    ready_orders = [
-        order
-        for order in db.list_orders()
-        if order.status == OrderStatus.READY_FOR_PICKUP and order.run_id is None
-    ]
-    # filter the orders based on if they fit in the volunteer's car AND sort by urgency
-    fitting = sorted(
-        (order for order in ready_orders if _fits(volunteer.car_size, order.size)),
-        key=lambda order: (-_URGENCY_RANK[order.urgency], order.created_at, order.id),
-    )
-    # convert all of the orders into OrderOut objects
-    orders_out = [order_out(db, order) for order in fitting]
-    return OrdersResponse(orders=orders_out)
+    # added filtering to the databse (way faster lol)
+    fitting = db.list_available_orders(volunteer.car_size)
+    return OrdersResponse(orders=orders_out(db, fitting))
 
 
 """
@@ -167,44 +155,18 @@ def get_orders(
         # don't let the org see the assigned status (as per the API spec)
         unassigned = False
 
-    # If a volunteer_id is set grab all runs where the volunteer is assigned to it
-    volunteer_run_ids: set[int] = set()
-    if volunteer_id is not None:
-        volunteer_run_ids = {
-            run.id for run in db.list_runs() if run.volunteer_id == volunteer_id
-        }
-
-    # filter all of the orders based on the parsed params
-    matching = sorted(
-        (
-            order
-            for order in db.list_orders()
-            # filter on status if set
-            if (status is None or order.status == status)
-            # filter on size if set
-            and (size is None or order.size == size)
-            # etc
-            and (urgency is None or order.urgency == urgency)
-            # match on an organisation_id if set to match on either the 'from' or 'to' org
-            and (
-                organisation_id is None
-                or organisation_id
-                in (order.from_organisation_id, order.to_organisation_id)
-            )
-            # match only on the orders that exist in a run where the volunteer with volunteer_id is assigned to that run
-            and (volunteer_id is None or order.run_id in volunteer_run_ids)
-            # return only unassigned (if flag set)
-            and (not unassigned or order.run_id is None)
-        ),
-        key=lambda order: (order.created_at, order.id),
-        # return newest first
-        reverse=True,
+    # added filtering to the database instead of just returning all
+    page, total = db.search_orders(
+        status=status,
+        size=size,
+        urgency=urgency,
+        organisation_id=organisation_id,
+        volunteer_id=volunteer_id,
+        unassigned=unassigned,
+        limit=limit,
+        offset=offset,
     )
-    # set the page based on our defined offset and limit, allowing for pagination
-    page = matching[offset : offset + limit]
-    return OrdersResponse(
-        orders=[order_out(db, order) for order in page], total=len(matching)
-    )
+    return OrdersResponse(orders=orders_out(db, page), total=total)
 
 
 """
