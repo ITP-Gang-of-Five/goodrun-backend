@@ -33,7 +33,7 @@ def _location_fields(
     }
 
 
-#converts a single order into a dictionary, using locations, runs and users that were already fetched
+# converts a single order into a dictionary, using locations, runs and users that were already fetched
 def _fields(
     order: Order,
     locations: dict[int, Location],
@@ -65,13 +65,15 @@ def _fields(
 """
 converts many orders from database entries into dictionaries, fetching everything they need in bulk
 """
+
+
 def orders_fields(db: Queries, orders: list[Order]) -> list[dict[str, object]]:
     locations = db.get_locations(
         {order.from_location_id for order in orders}
         | {order.to_location_id for order in orders}
     )
     runs = db.get_runs({order.run_id for order in orders if order.run_id is not None})
-    #must grab all of the users that are mentioned by the db
+    # must grab all of the users that are mentioned by the db
     user_ids = {order.created_by_id for order in orders}
     user_ids |= {
         org_id
@@ -87,6 +89,8 @@ def orders_fields(db: Queries, orders: list[Order]) -> list[dict[str, object]]:
 """
 converts an order from a database entry into a dictionary for use
 """
+
+
 def order_fields(db: Queries, order: Order) -> dict[str, object]:
     return orders_fields(db, [order])[0]
 
@@ -94,6 +98,8 @@ def order_fields(db: Queries, order: Order) -> dict[str, object]:
 """
 Converts stored orders into OrderOuts (order objects for response). Used for lists
 """
+
+
 def orders_out(db: Queries, orders: list[Order]) -> list[OrderOut]:
     return [OrderOut(**fields) for fields in orders_fields(db, orders)]
 
@@ -101,5 +107,7 @@ def orders_out(db: Queries, orders: list[Order]) -> list[OrderOut]:
 """
 Converts a stored order into an OrderOut (an order object for response)
 """
+
+
 def order_out(db: Queries, order: Order) -> OrderOut:
     return orders_out(db, [order])[0]

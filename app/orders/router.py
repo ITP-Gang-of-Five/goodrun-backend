@@ -120,7 +120,7 @@ Returns an OrdersResponse for the current Volunteer containing the list of avail
 
 @router.get("/available")
 def get_available_orders(volunteer: VolunteerUser, db: QueriesDep) -> OrdersResponse:
-    #added filtering to the databse (way faster lol)
+    # added filtering to the databse (way faster lol)
     fitting = db.list_available_orders(volunteer.car_size)
     return OrdersResponse(orders=orders_out(db, fitting))
 
@@ -155,7 +155,7 @@ def get_orders(
         # don't let the org see the assigned status (as per the API spec)
         unassigned = False
 
-    #added filtering to the database instead of just returning all 
+    # added filtering to the database instead of just returning all
     page, total = db.search_orders(
         status=status,
         size=size,

@@ -130,7 +130,7 @@ class Queries:
         return User(**row) if row else None
 
     def get_users(self, user_ids: set[int]) -> dict[int, User]:
-        #fetch MULTIPLE users 
+        # fetch MULTIPLE users
         if not user_ids:
             return {}
         rows = self._connection.execute(
@@ -238,7 +238,7 @@ class Queries:
         return Location(**row) if row else None
 
     def get_locations(self, location_ids: set[int]) -> dict[int, Location]:
-        #fetch MULTIPLE locations
+        # fetch MULTIPLE locations
         if not location_ids:
             return {}
         rows = self._connection.execute(
@@ -279,7 +279,7 @@ class Queries:
         return Run(**row) if row else None
 
     def get_runs(self, run_ids: set[int]) -> dict[int, Run]:
-        #fetch MULTIPLE runs
+        # fetch MULTIPLE runs
         if not run_ids:
             return {}
         rows = self._connection.execute(
@@ -373,7 +373,7 @@ class Queries:
         return [Order(**row) for row in rows]
 
     def list_orders_for_runs(self, run_ids: list[int]) -> list[Order]:
-        #same as list_orders_for_run but does it for multiple runs in a single query
+        # same as list_orders_for_run but does it for multiple runs in a single query
         if not run_ids:
             return []
         rows = self._connection.execute(

@@ -23,11 +23,11 @@ HELPER FUNCTIONS
 """
 
 
-#converts multiple runs into RunOuts fetching all orders and volunteers in bulk
+# converts multiple runs into RunOuts fetching all orders and volunteers in bulk
 def _runs_out(db: Queries, runs: list[Run]) -> list[RunOut]:
     orders = db.list_orders_for_runs([run.id for run in runs])
 
-    #group orders by the run they are in
+    # group orders by the run they are in
     orders_by_run: dict[int, list[OrderOut]] = defaultdict(list)
     for order, out in zip(orders, orders_out(db, orders), strict=True):
         assert order.run_id is not None
