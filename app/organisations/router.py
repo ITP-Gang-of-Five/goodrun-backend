@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser
+from app.common.users import require_unused_email
 from app.errors import ApiError
 from app.organisations.schemas import (
     CreateOrganisationRequest,
@@ -57,8 +58,7 @@ def get_organisation(
 def create_organisation(
     body: CreateOrganisationRequest, admin: AdminUser, db: QueriesDep
 ) -> OrganisationOut:
-    if db.get_user_by_email(body.email) is not None:
-        raise ApiError(409, "EMAIL_TAKEN", "A user with that email already exists")
+    require_unused_email(db, body.email)
 
     user = db.add_user(
         User(

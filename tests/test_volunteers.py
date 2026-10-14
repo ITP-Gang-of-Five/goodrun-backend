@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 VOLUNTEERS = "/api/v0/volunteers/"
@@ -22,7 +23,7 @@ def test_admin_can_create_and_then_get_a_volunteer(client: TestClient) -> None:
         json={
             "name": "New Volunteer",
             "email": "new.volunteer@example.com",
-            "password": "hunter2",
+            "password": "hunter22",
             "carSize": "SMALL",
         },
         headers=headers,
@@ -50,13 +51,13 @@ def test_create_volunteer_with_taken_email_returns_409(client: TestClient) -> No
         json={
             "name": "Duplicate",
             "email": VOLUNTEER["email"],
-            "password": "hunter2",
+            "password": "hunter22",
         },
         headers=headers,
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "EMAIL_TAKEN"
+    assert response.json()["error"]["code"] == "EMAIL_ALREADY_IN_USE"
 
 
 def test_create_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
@@ -64,7 +65,11 @@ def test_create_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
 
     response = client.post(
         VOLUNTEERS,
-        json={"name": "New Volunteer", "email": "x@example.com", "password": "x"},
+        json={
+            "name": "New Volunteer",
+            "email": "x@example.com",
+            "password": "password1",
+        },
         headers=headers,
     )
 
@@ -75,7 +80,11 @@ def test_create_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
 def test_create_volunteer_requires_auth(client: TestClient) -> None:
     response = client.post(
         VOLUNTEERS,
-        json={"name": "New Volunteer", "email": "x@example.com", "password": "x"},
+        json={
+            "name": "New Volunteer",
+            "email": "x@example.com",
+            "password": "password1",
+        },
     )
 
     assert response.status_code == 401
@@ -133,7 +142,7 @@ def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) ->
         json={
             "name": "New Volunteer",
             "email": "new.volunteer@example.com",
-            "password": "hunter2",
+            "password": "hunter22",
             "carSize": "LARGE",
         },
         headers=headers,
@@ -142,3 +151,41 @@ def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) ->
     response = client.get(VOLUNTEERS, headers=headers)
     # our new volunteer should be in there
     assert created in response.json()["volunteers"]
+
+
+# every field rule from app/common/validation.py should be enforced, whatever the frontend sends
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"name": "   "},
+        {"name": "x" * 101},
+        {"email": "not-an-email"},
+        {"password": "short"},
+        {"password": "x" * 129},
+    ],
+)
+def test_create_volunteer_rejects_invalid_fields(
+    client: TestClient, overrides: dict[str, str]
+) -> None:
+    headers = _auth_headers(client, ADMIN)
+    body = {"name": "Jo", "email": "jo@example.com", "password": "password1"}
+
+    response = client.post(VOLUNTEERS, json={**body, **overrides}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_create_volunteer_stores_email_trimmed_and_lower_case(
+    client: TestClient,
+) -> None:
+    headers = _auth_headers(client, ADMIN)
+
+    created = client.post(
+        VOLUNTEERS,
+        json={"name": "Jo", "email": "  Jo@Example.COM ", "password": "password1"},
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    assert created.json()["email"] == "jo@example.com"

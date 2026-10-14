@@ -34,6 +34,8 @@ from app.storage import (
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
+# the statuses an order can be removed from, i.e. it's still waiting in the pool
+_REMOVABLE_ORDER_STATUSES = {OrderStatus.PENDING, OrderStatus.READY_FOR_PICKUP}
 # hashmap for urgency enum to an integer
 _URGENCY_RANK = {Urgency.LOW: 0, Urgency.MEDIUM: 1, Urgency.HIGH: 2}
 # list of available car sizes from the enum CarSize
@@ -179,6 +181,14 @@ def create_order(
     body: CreateOrderRequest, admin: AdminUser, db: QueriesDep
 ) -> OrderIdResponse:
 
+    # Step 0: an order has to actually go somewhere
+    if body.from_location_id == body.to_location_id:
+        raise ApiError(
+            400,
+            "INVALID_ORDER",
+            "The pick up and drop off can't be the same location",
+        )
+
     # Step 1: extract all the locations that are set for the order. raise error if those locations aren't found
     for location_id in (body.from_location_id, body.to_location_id):
         if db.get_location(location_id) is None:
@@ -265,12 +275,13 @@ Remove a specified order
 @router.post("/{order_id}/remove", status_code=204)
 def remove_order(order_id: int, admin: AdminUser, db: QueriesDep) -> Response:
     order = _require_order(db, admin, order_id)
-    # only an order that is not in a run can be removed
-    if order.run_id is not None:
+    # only an order still waiting in the pool can be removed. one on a run goes when the run is removed,
+    # and a delivered or cancelled order is already finished
+    if order.run_id is not None or order.status not in _REMOVABLE_ORDER_STATUSES:
         raise ApiError(
             409,
             "ORDER_NOT_AVAILABLE",
-            "Only orders that are not on a run can be removed",
+            "Only orders waiting to be picked up can be removed",
         )
     # update the order with the cancelled status and record the event for it
     db.update_order(order.model_copy(update={"status": OrderStatus.CANCELLED}))

@@ -221,3 +221,29 @@ def test_geocode_with_no_results_is_not_found(
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "ADDRESS_NOT_FOUND"
+
+
+# short queries are rejected before anything is sent to (and paid for with) the location api
+def test_autocomplete_rejects_a_short_query_without_calling_aws(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the location api should not have been called")
+
+    monkeypatch.setattr(locations_api, "suggest", fail)
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.get(AUTOCOMPLETE, params={"query": "ab"}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_create_location_rejects_a_blank_name(client: TestClient) -> None:
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.post(
+        LOCATIONS, json={"name": "  ", "address": "300 Grattan St"}, headers=headers
+    )
+
+    assert response.status_code == 422

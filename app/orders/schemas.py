@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field
 
 from app.common.schemas import CamelModel, UserRef
+from app.common.validation import Description, FutureDatetime, OptionalNotes
 from app.locations.schemas import LocationOut
 from app.storage import CarSize, OrderStatus, Urgency
 
@@ -66,13 +67,13 @@ class CreateOrderRequest(CamelModel):
     from_location_id: int
     to_location_id: int
     size: CarSize
-    description: str
+    description: Description
     urgency: Urgency
     from_organisation_id: int | None = None
     to_organisation_id: int | None = None
-    due_at: datetime | None = None
-    pickup_notes: str | None = None
-    dropoff_notes: str | None = None
+    due_at: FutureDatetime | None = None
+    pickup_notes: OptionalNotes = None
+    dropoff_notes: OptionalNotes = None
 
 
 # response with an OrderID

@@ -23,7 +23,7 @@ def test_admin_can_create_and_then_get_an_organisation(client: TestClient) -> No
         json={
             "name": "New Organisation",
             "email": "new.org@example.com",
-            "password": "hunter2",
+            "password": "hunter22",
         },
         headers=headers,
     )
@@ -49,13 +49,13 @@ def test_create_organisation_with_taken_email_returns_409(client: TestClient) ->
         json={
             "name": "Duplicate",
             "email": ORGANISATION["email"],
-            "password": "hunter2",
+            "password": "hunter22",
         },
         headers=headers,
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "EMAIL_TAKEN"
+    assert response.json()["error"]["code"] == "EMAIL_ALREADY_IN_USE"
 
 
 def test_create_organisation_forbidden_for_non_admin(client: TestClient) -> None:
@@ -63,7 +63,11 @@ def test_create_organisation_forbidden_for_non_admin(client: TestClient) -> None
 
     response = client.post(
         ORGANISATIONS,
-        json={"name": "New Organisation", "email": "x@example.com", "password": "x"},
+        json={
+            "name": "New Organisation",
+            "email": "x@example.com",
+            "password": "password1",
+        },
         headers=headers,
     )
 
@@ -74,7 +78,11 @@ def test_create_organisation_forbidden_for_non_admin(client: TestClient) -> None
 def test_create_organisation_requires_auth(client: TestClient) -> None:
     response = client.post(
         ORGANISATIONS,
-        json={"name": "New Organisation", "email": "x@example.com", "password": "x"},
+        json={
+            "name": "New Organisation",
+            "email": "x@example.com",
+            "password": "password1",
+        },
     )
 
     assert response.status_code == 401

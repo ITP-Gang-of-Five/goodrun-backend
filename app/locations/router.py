@@ -3,6 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.deps import AdminUser
+from app.common.validation import (
+    ADDRESS_MAX_LENGTH,
+    ADDRESS_MIN_LENGTH,
+    AUTOCOMPLETE_MAX_LENGTH,
+    AUTOCOMPLETE_MIN_LENGTH,
+)
 from app.locations import locations
 from app.locations.schemas import (
     CreateLocationRequest,
@@ -59,7 +65,10 @@ def create_location(
 @router.get("/autocomplete")
 def autocomplete_location(
     admin: AdminUser,
-    query: Annotated[str, Query(min_length=1)],
+    query: Annotated[
+        str,
+        Query(min_length=AUTOCOMPLETE_MIN_LENGTH, max_length=AUTOCOMPLETE_MAX_LENGTH),
+    ],
 ) -> LocationSuggestionsResponse:
     return LocationSuggestionsResponse(suggestions=locations.suggest(query))
 
@@ -70,6 +79,9 @@ def geocode_location(
     suggestion_id: Annotated[
         str | None, Query(alias="suggestionId", min_length=1)
     ] = None,
-    address: Annotated[str | None, Query(min_length=1)] = None,
+    address: Annotated[
+        str | None,
+        Query(min_length=ADDRESS_MIN_LENGTH, max_length=ADDRESS_MAX_LENGTH),
+    ] = None,
 ) -> ResolvedLocationOut:
     return locations.resolve_location(suggestion_id=suggestion_id, address=address)

@@ -50,3 +50,12 @@ def test_non_volunteers_cannot_set_a_car_size(client: TestClient) -> None:
     response = client.patch(ME, json={"carSize": "LARGE"}, headers=headers)
     # 401 cause admins don't have cars, only volunteers
     assert response.status_code == 403
+
+
+def test_update_my_profile_rejects_a_blank_name(client: TestClient) -> None:
+    headers = _auth_headers(client, VOLUNTEER)
+
+    response = client.patch(ME, json={"name": "   "}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
