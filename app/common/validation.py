@@ -25,7 +25,7 @@ ADDRESS_MAX_LENGTH = 300
 # long enough to be worth looking up
 AUTOCOMPLETE_MIN_LENGTH = 3
 AUTOCOMPLETE_MAX_LENGTH = 200
-RUN_MAX_ORDERS = 3
+RUN_MAX_ORDERS = 20
 
 
 def _lowercase(email: str) -> str:
