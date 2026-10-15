@@ -53,7 +53,7 @@ def _runs_out(db: Queries, runs: list[Run]) -> list[RunOut]:
         assert order.run_id is not None
         orders_by_run[order.run_id].append(out)
 
-    #add each of their steps which come back in the route's order
+    # add each of their steps which come back in the route's order
     steps_by_run: dict[int, list[RunStepOut]] = defaultdict(list)
     for step in db.list_steps_for_runs(run_ids):
         steps_by_run[step.run_id].append(
@@ -128,6 +128,8 @@ Cancels an in progress run, the one place a run is cancelled along with its orde
   they stay on it
 Orders already delivered are left alone, since a delivery that happened can't be undone
 """
+
+
 def _cancel_run(
     db: Queries, run: Run, *, order_status: OrderStatus, release_orders: bool = False
 ) -> None:
@@ -166,6 +168,8 @@ Checks a route is one a volunteer could actually do: every order is picked up ex
 and dropped off exactly once, and never dropped off before it's been picked up. Returns the
 orders it's made of (in pickup order) alongside its steps with the ids turned into numbers
 """
+
+
 def _parse_route(
     route: list[RunStepIn],
 ) -> tuple[list[int], list[tuple[int, RunStepType]]]:

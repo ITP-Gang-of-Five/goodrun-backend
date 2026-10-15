@@ -93,7 +93,7 @@ _RUN_STEP_COLUMNS = """
 FROM run_steps s
 """
 
-#the location where an order's pickup sits in the route of the run.
+# the location where an order's pickup sits in the route of the run.
 _BY_PICKUP_POSITION = """
     (SELECT position FROM run_steps s
      WHERE s.run_id = orders.run_id AND s.order_id = orders.order_id

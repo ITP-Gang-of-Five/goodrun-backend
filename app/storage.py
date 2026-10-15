@@ -110,12 +110,12 @@ class Order(BaseModel):
     created_at: datetime
 
 
-#A single stop on a runs route (either picking up or dropping off one of its orders)
+# A single stop on a runs route (either picking up or dropping off one of its orders)
 class RunStep(BaseModel):
     run_id: int
     order_id: int
     type: RunStepType
-    #the index of this step in the route
+    # the index of this step in the route
     position: int
     completed_at: datetime | None = None
 

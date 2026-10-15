@@ -5,7 +5,7 @@ from app.orders.schemas import OrderOut
 from app.storage import RunStatus, RunStepType
 
 
-#one stop on a run's route, which is either a pickup or a drop off of one order
+# one stop on a run's route, which is either a pickup or a drop off of one order
 class RunStepOut(CamelModel):
     order_id: str
     type: RunStepType
@@ -20,7 +20,7 @@ class RunOut(CamelModel):
     started_at: datetime | None
     completed_at: datetime | None
     orders: list[OrderOut]
-    #the route in the order the volunteer pplanned it
+    # the route in the order the volunteer pplanned it
     steps: list[RunStepOut]
 
 
