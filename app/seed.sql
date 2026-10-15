@@ -1,6 +1,6 @@
 -- Development seed data. Run after schema.sql. Safe to re-run.
 
-TRUNCATE users, volunteer_preferences, locations, runs,
+TRUNCATE users, volunteer_preferences, locations, runs, run_steps,
          orders, order_events, order_images, volunteer_locations
 RESTART IDENTITY CASCADE;
 
@@ -31,16 +31,20 @@ INSERT INTO orders (
     run_id, from_organisation_id, to_organisation_id,
     from_location_id, to_location_id, created_by_id,
     description, size, urgency, status,
-    pickup_notes, dropoff_notes, due_at, sequence, created_at
+    pickup_notes, dropoff_notes, due_at, created_at
 ) VALUES
     (1, 3, NULL, 1, 2, 1,
      '2 sealed boxes, surgical consumables', 'MEDIUM', 'MEDIUM', 'IN_TRANSIT',
      'Loading dock B, ask for stores', 'Roller door, ask for Priya',
-     '2026-09-20T13:54:19Z', 1, '2026-09-20T07:54:19Z'),
+     '2026-09-20T13:54:19Z', '2026-09-20T07:54:19Z'),
     (NULL, 3, NULL, 1, 2, 1,
      'Sterile gloves, assorted sizes', 'SMALL', 'HIGH', 'READY_FOR_PICKUP',
      'Loading dock B, ask for stores', 'Roller door, ask for Priya',
-     '2026-09-21T12:54:19Z', NULL, '2026-09-21T02:54:19Z');
+     '2026-09-21T12:54:19Z', '2026-09-21T02:54:19Z');
+
+INSERT INTO run_steps (run_id, order_id, type, position, completed_at) VALUES
+    (1, 1, 'PICKUP',  0, '2026-09-20T08:54:19Z'),
+    (1, 1, 'DROPOFF', 1, NULL);
 
 INSERT INTO order_events (order_id, new_status, created_at) VALUES
     (1, 'READY_FOR_PICKUP', '2026-09-20T07:54:19Z'),
