@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+
+from app.auth.limits import client_ip, login_attempts
+from app.auth.passwords import DUMMY_HASH, verify_password
 
 # import all of the schemas defined in schemas.py
 from app.auth.schemas import (
@@ -16,14 +19,27 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login")
-def login(body: LoginRequest, queries: QueriesDep) -> LoginResponse:
+def login(body: LoginRequest, request: Request, queries: QueriesDep) -> LoginResponse:
+    # refuse straight away if whoever is asking has had too many wrong passwords recently
+    ip = client_ip(request)
+    login_attempts.check(ip, body.email)
 
     # grab the user by their email (since that is what is inputted into the request body)
     user = queries.get_user_by_email(body.email)
 
-    # if user doesn't exit or the password isn't correct (NB: will use actual encryption and things later)
-    if user is None or user.password_hash != body.password:
+    # NB: the password is checked even when no account has this email (against a dummy
+    # hash), so an unknown email is as slow to reject as a wrong password and the timing
+    # doesn't give away which emails have accounts
+    password_ok = verify_password(
+        body.password, user.password_hash if user else DUMMY_HASH
+    )
+
+    # if user doesn't exist or the password isn't correct
+    if user is None or not password_ok:
+        login_attempts.record_failure(ip, body.email)
         raise ApiError(401, "INVALID_CREDENTIALS", "Incorrect email or password")
+
+    login_attempts.clear(ip, body.email)
 
     return LoginResponse(
         # make all of the necessary tokens for this user

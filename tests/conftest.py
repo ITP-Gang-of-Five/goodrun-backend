@@ -7,8 +7,18 @@ import requests
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
+from app.auth.limits import login_attempts
 from app.main import app
 from app.queries import DATABASE_URL, Queries, get_queries
+
+
+@pytest.fixture(autouse=True)
+def forget_failed_logins() -> Iterator[None]:
+    # failed logins are counted in memory for the life of the server, which in tests is the
+    # whole run, so without this a test's wrong passwords could lock out a later test
+    login_attempts.reset()
+    yield
+    login_attempts.reset()
 
 
 @pytest.fixture(autouse=True)

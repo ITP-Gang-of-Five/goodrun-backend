@@ -1,10 +1,14 @@
 from pydantic import BaseModel, Field
 
+from app.common.validation import PASSWORD_MAX_LENGTH
+
 
 # Models for each of our requests
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    # NB: not the Email type, since the seeded admin logs in as plain "admin"
+    email: str = Field(max_length=255)
+    # capped so nobody can make the server hash a huge password, which is slow on purpose
+    password: str = Field(max_length=PASSWORD_MAX_LENGTH)
 
 
 class RefreshRequest(BaseModel):

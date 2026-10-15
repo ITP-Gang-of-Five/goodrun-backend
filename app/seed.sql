@@ -4,10 +4,15 @@ TRUNCATE users, volunteer_preferences, locations, runs,
          orders, order_events, order_images, volunteer_locations
 RESTART IDENTITY CASCADE;
 
-INSERT INTO users (email, name, password_hash, role, created_at) VALUES
-    ('admin',                  'Admin',                    'admin',        'ADMIN',        '2026-09-01T09:00:00Z'),
-    ('tara@example.com',       'Tara Nguyen',              'volunteer',    'VOLUNTEER',    '2026-09-01T09:00:00Z'),
-    ('stores@rmh.example.com', 'Royal Melbourne Hospital', 'organisation', 'ORGANISATION', '2026-09-01T09:00:00Z');
+-- passwords are stored as Argon2 hashes. the logins are admin / admin,
+-- tara@example.com / volunteer and stores@rmh.example.com / organisation (see the README)
+INSERT INTO users (email, name, role, created_at, password_hash) VALUES
+    ('admin', 'Admin', 'ADMIN', '2026-09-01T09:00:00Z',
+     '$argon2id$v=19$m=65536,t=3,p=4$AJUsTd86JCSlUzP+4s6YVg$gKqAOgpOaJzaNIxMsnN9GGsGVVlQz2fJl4xj7atmin8'),
+    ('tara@example.com', 'Tara Nguyen', 'VOLUNTEER', '2026-09-01T09:00:00Z',
+     '$argon2id$v=19$m=65536,t=3,p=4$0KSSoXCikHcstEpnxT1o4g$kATuzfrjkG5x6h6EzJuzv0Lxz2a5NK3u6eNM5IRd4rk'),
+    ('stores@rmh.example.com', 'Royal Melbourne Hospital', 'ORGANISATION', '2026-09-01T09:00:00Z',
+     '$argon2id$v=19$m=65536,t=3,p=4$eCFw0i8pVRpET+Rke8BsSQ$+Q/lve2lXn/+FtbyeN9mCHAjUaK0ZBhqcg4wu4QybV0');
 
 -- only the volunteer gets a preferences row
 INSERT INTO volunteer_preferences (volunteer_id, car_size) VALUES

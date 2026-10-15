@@ -33,7 +33,11 @@ the project root:
 
 ```
 DATABASE_URL=postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require
+JWT_SECRET=paste-the-output-of-openssl-rand-hex-32-here
 ```
+
+The server won't start without a `JWT_SECRET` of at least 32 characters, generate one with
+`openssl rand -hex 32`.
 
 `.env` is gitignored, keep it that way, it has the password in it.
 
@@ -45,8 +49,14 @@ Logins for the seeded accounts:
 | `tara@example.com` | `volunteer` | VOLUNTEER |
 | `stores@rmh.example.com` | `organisation` | ORGANISATION |
 
-NB: passwords are still plain text in the `password_hash` column. The column is named for
-where this is going, hashing is a separate job.
+Passwords are stored as Argon2 hashes. If these logins stop working your database still has
+plain text passwords, rebuild it with `uv run python scripts/db.py app/schema.sql app/seed.sql`.
+
+
+# Production
+
+Never load `seed.sql` in production. Create the first admin with
+`uv run python scripts/create_admin.py` and set `ENVIRONMENT=production` to hide `/docs`.
 
 
 # Locations and routing
