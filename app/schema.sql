@@ -1,7 +1,7 @@
 -- Good Run database schema (Sprint 2). Mirrors the Data Model diagram.
 
 DROP TABLE IF EXISTS
-    run_steps, order_images, order_events, orders, runs,
+    order_images, order_events, orders, runs,
     volunteer_locations, volunteer_preferences, locations, users
 CASCADE;
 
@@ -50,9 +50,6 @@ CREATE TABLE runs (
     completed_at TIMESTAMPTZ NULL
 );
 
--- a volunteer can only be on one run at a time. The API will check this first
-CREATE UNIQUE INDEX runs_one_in_progress ON runs (volunteer_id) WHERE status = 'IN_PROGRESS';
-
 
 -- A single delivery. run_id is null while the order sits in the available pool.
 -- from/to organisation are both optional, an order has 0, 1 or 2 attached.
@@ -71,26 +68,14 @@ CREATE TABLE orders (
     pickup_notes         TEXT NULL,
     dropoff_notes        TEXT NULL,
     due_at               TIMESTAMPTZ NULL,
+    -- where this order sits in its run, null while it has no run
+    sequence             INT NULL,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- the agreement's INVALID_ORDER case, you cannot deliver somewhere to itself
     CONSTRAINT orders_distinct_endpoints CHECK (from_location_id <> to_location_id)
 );
 
 CREATE INDEX orders_run_idx ON orders (run_id);
-
-
--- The route of a run. Every order on a run gets one PICKUP and one DROPOFF step in the order
--- the volunteer planned them to be in on the app
-CREATE TABLE run_steps (
-    run_id       BIGINT NOT NULL REFERENCES runs(run_id),
-    order_id     BIGINT NOT NULL REFERENCES orders(order_id),
-    type         TEXT NOT NULL CHECK (type IN ('PICKUP', 'DROPOFF')),
-    position     INT NOT NULL,
-    completed_at TIMESTAMPTZ NULL,
-    PRIMARY KEY (run_id, position),
-    -- each order is picked up once and dropped off once per run
-    CONSTRAINT run_steps_one_of_each UNIQUE (run_id, order_id, type)
-);
 
 -- orders/available reads exactly this slice, so index only that slice
 CREATE INDEX orders_available_idx ON orders (urgency, created_at)
