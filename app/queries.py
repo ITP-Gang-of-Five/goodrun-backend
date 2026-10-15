@@ -4,6 +4,7 @@ Talking to the Postgres database.
 
 import os
 from collections.abc import Iterator
+from datetime import datetime
 from typing import Annotated, Any
 
 import psycopg
@@ -22,6 +23,7 @@ from app.storage import (
     Role,
     Run,
     RunStatus,
+    RunStep,
     Urgency,
     User,
     VolunteerLocation,
@@ -82,8 +84,20 @@ FROM runs
 _ORDER_COLUMNS = """
     order_id AS id, run_id, size, description, status, urgency,
     from_location_id, to_location_id, from_organisation_id, to_organisation_id,
-    due_at, pickup_notes, dropoff_notes, sequence, created_by_id, created_at
+    due_at, pickup_notes, dropoff_notes, created_by_id, created_at
 FROM orders
+"""
+
+_RUN_STEP_COLUMNS = """
+    s.run_id, s.order_id, s.type, s.position, s.completed_at
+FROM run_steps s
+"""
+
+# the location where an order's pickup sits in the route of the run.
+_BY_PICKUP_POSITION = """
+    (SELECT position FROM run_steps s
+     WHERE s.run_id = orders.run_id AND s.order_id = orders.order_id
+       AND s.type = 'PICKUP') NULLS LAST, order_id
 """
 
 _ORDER_EVENT_COLUMNS = """
@@ -343,6 +357,72 @@ class Queries:
         if result.rowcount == 0:
             raise KeyError(f"run {run.id} does not exist")
 
+    def lock_run(self, run_id: int) -> Run | None:
+        """
+        get_run, but holds the run until the request finishes, so two requests changing
+        the same run (e.g. finishing its last two steps at once) take turns rather than
+        each missing what the other did
+        """
+        row = self._connection.execute(
+            f"SELECT {_RUN_COLUMNS} WHERE run_id = %s FOR UPDATE", (run_id,)
+        ).fetchone()
+        return Run(**row) if row else None
+
+    """
+    ---------
+    Run steps
+    ---------
+    """
+
+    def add_run_steps(self, steps: list[RunStep]) -> None:
+        with self._connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO run_steps (run_id, order_id, type, position, completed_at)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        step.run_id,
+                        step.order_id,
+                        step.type,
+                        step.position,
+                        step.completed_at,
+                    )
+                    for step in steps
+                ],
+            )
+
+    def list_steps_for_runs(self, run_ids: list[int]) -> list[RunStep]:
+        """
+        The steps of several runs in one query, in route order.
+
+        Only steps for orders still on the run are included. A cancelled run releases
+        its orders back into the pool, so like its orders, its steps come back empty.
+        """
+        if not run_ids:
+            return []
+        rows = self._connection.execute(
+            f"""SELECT {_RUN_STEP_COLUMNS}
+            JOIN orders o ON o.order_id = s.order_id AND o.run_id = s.run_id
+            WHERE s.run_id = ANY(%s)
+            ORDER BY s.run_id, s.position""",
+            (run_ids,),
+        ).fetchall()
+        return [RunStep(**row) for row in rows]
+
+    def list_steps_for_run(self, run_id: int) -> list[RunStep]:
+        return self.list_steps_for_runs([run_id])
+
+    def complete_run_step(self, step: RunStep, completed_at: datetime) -> None:
+        self._connection.execute(
+            """
+            UPDATE run_steps SET completed_at = %s
+            WHERE run_id = %s AND position = %s
+            """,
+            (completed_at, step.run_id, step.position),
+        )
+
     """
     ---------
     Orders
@@ -362,12 +442,11 @@ class Queries:
         return [Order(**row) for row in rows]
 
     def list_orders_for_run(self, run_id: int) -> list[Order]:
-        # sequence is the order the volunteer said they would do them in. It is
-        # nullable, so NULLS LAST keeps anything without one at the end.
+        # in the order the volunteer planned to pick them up
         rows = self._connection.execute(
             f"""SELECT {_ORDER_COLUMNS}
             WHERE run_id = %s
-            ORDER BY sequence NULLS LAST, order_id""",
+            ORDER BY {_BY_PICKUP_POSITION}""",
             (run_id,),
         ).fetchall()
         return [Order(**row) for row in rows]
@@ -379,7 +458,7 @@ class Queries:
         rows = self._connection.execute(
             f"""SELECT {_ORDER_COLUMNS}
             WHERE run_id = ANY(%s)
-            ORDER BY run_id, sequence NULLS LAST, order_id""",
+            ORDER BY run_id, {_BY_PICKUP_POSITION}""",
             (run_ids,),
         ).fetchall()
         return [Order(**row) for row in rows]
@@ -473,13 +552,6 @@ class Queries:
         ).fetchall()
         return [Order(**row) for row in rows]
 
-    def set_order_sequence(self, order_id: int, sequence: int | None) -> None:
-        # where this order sits in its run, i.e. the order the volunteer will do them in
-        self._connection.execute(
-            "UPDATE orders SET sequence = %s WHERE order_id = %s",
-            (sequence, order_id),
-        )
-
     def set_orders_run(
         self, order_ids: list[int], run_id: int | None, status: OrderStatus
     ) -> None:
@@ -497,10 +569,10 @@ class Queries:
                 run_id, size, description, status, urgency,
                 from_location_id, to_location_id,
                 from_organisation_id, to_organisation_id,
-                due_at, pickup_notes, dropoff_notes, sequence,
+                due_at, pickup_notes, dropoff_notes,
                 created_by_id, created_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING order_id
             """,
             (
@@ -516,7 +588,6 @@ class Queries:
                 order.due_at,
                 order.pickup_notes,
                 order.dropoff_notes,
-                order.sequence,
                 order.created_by_id,
                 order.created_at,
             ),
@@ -531,7 +602,7 @@ class Queries:
             SET run_id = %s, size = %s, description = %s, status = %s, urgency = %s,
                 from_location_id = %s, to_location_id = %s,
                 from_organisation_id = %s, to_organisation_id = %s,
-                due_at = %s, pickup_notes = %s, dropoff_notes = %s, sequence = %s,
+                due_at = %s, pickup_notes = %s, dropoff_notes = %s,
                 created_by_id = %s, created_at = %s
             WHERE order_id = %s
             """,
@@ -548,7 +619,6 @@ class Queries:
                 order.due_at,
                 order.pickup_notes,
                 order.dropoff_notes,
-                order.sequence,
                 order.created_by_id,
                 order.created_at,
                 order.id,
