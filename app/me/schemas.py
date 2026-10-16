@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.common.schemas import CamelModel
+from app.common.validation import Name
 from app.storage import CarSize, Role
 
 
@@ -16,5 +17,5 @@ class ProfileOut(CamelModel):
 
 # input request for updating a user's own profile (so the id is already known, since they are making the request)
 class UpdateProfileRequest(CamelModel):
-    name: str | None = None
+    name: Name | None = None
     car_size: CarSize | None = None

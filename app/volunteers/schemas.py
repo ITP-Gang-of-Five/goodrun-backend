@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.common.schemas import CamelModel
+from app.common.validation import Email, Name, Password
 from app.storage import CarSize
 
 
@@ -20,7 +21,7 @@ class VolunteersOut(CamelModel):
 
 # input for registering a new volunteer account
 class CreateVolunteerRequest(CamelModel):
-    name: str
-    email: str
-    password: str
+    name: Name
+    email: Email
+    password: Password
     car_size: CarSize | None = None

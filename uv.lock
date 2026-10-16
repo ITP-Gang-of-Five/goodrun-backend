@@ -524,6 +524,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pydantic", extra = ["email"] },
     { name = "pyjwt" },
     { name = "requests" },
 ]
@@ -542,6 +543,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.6" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.13.5" },
     { name = "pyjwt", specifier = ">=2.14.0" },
     { name = "requests", specifier = ">=2.34.2" },
 ]

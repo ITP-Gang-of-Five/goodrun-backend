@@ -33,7 +33,9 @@ def update_my_profile(
     # model_dump converts the UpdateProfileRequest into a dict
     changes = body.model_dump(
         # excludes any fields that weren't in the response body
-        exclude_unset=True
+        exclude_unset=True,
+        # and any sent as null, so e.g. {"name": null} can't blank out someone's name
+        exclude_none=True,
     )
     # copy the actor and update it with these changed fields
     updated = actor.model_copy(update=changes)

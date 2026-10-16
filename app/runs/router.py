@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, Response
 
 from app.api.deps import AdminOrVolunteerUser, AdminUser, VolunteerUser
 from app.common.users import user_ref_from
+from app.common.validation import RUN_MAX_ORDERS
 from app.errors import ApiError
 from app.orders.schemas import OrderOut
 from app.orders.serializers import orders_out
@@ -77,6 +78,47 @@ def _require_visible_run(db: Queries, actor: User, run_id: int) -> Run:
     return run
 
 
+"""
+A run can only be changed (cancelled, completed or removed) while it's in progress. Once it's
+completed or cancelled it's final. Without this, e.g. removing a completed run would turn its
+delivered orders into cancelled ones
+"""
+
+
+def _require_in_progress(run: Run) -> None:
+    if run.status != RunStatus.IN_PROGRESS:
+        raise ApiError(409, "RUN_NOT_IN_PROGRESS", "This run isn't in progress")
+
+
+"""
+Finishes an in progress run, the one place a run's status and its orders' statuses change together:
+- run_status: what the run becomes (COMPLETED or CANCELLED)
+- order_status: what every order on it becomes
+- release_orders: if true the orders are taken off the run (back into the pool), else they stay on it
+"""
+
+
+def _finish_run(
+    db: Queries,
+    run: Run,
+    *,
+    run_status: RunStatus,
+    order_status: OrderStatus,
+    release_orders: bool = False,
+) -> None:
+    _require_in_progress(run)
+
+    order_ids = [order.id for order in db.list_orders_for_run(run.id)]
+    db.set_orders_run(order_ids, None if release_orders else run.id, order_status)
+    for order_id in order_ids:
+        _record_event(db, order_id, order_status)
+
+    update: dict[str, object] = {"status": run_status}
+    if run_status == RunStatus.COMPLETED:
+        update["completed_at"] = datetime.now(UTC)
+    db.update_run(run.model_copy(update=update))
+
+
 # fetches a run only if it exists and is assigned to the calling volunteer,
 # used by cancel/complete
 def _require_own_run(db: Queries, volunteer: User, run_id: int) -> Run:
@@ -140,6 +182,10 @@ def create_run(
         raise ApiError(
             400, "INVALID_RUN", "orderIds must be non-empty with no duplicates"
         )
+    if len(order_ids) > RUN_MAX_ORDERS:
+        raise ApiError(
+            400, "INVALID_RUN", f"A run can have at most {RUN_MAX_ORDERS} orders"
+        )
 
     if volunteer.car_size is None:
         raise ApiError(
@@ -185,34 +231,22 @@ def create_run(
 @router.post("/{run_id}/cancel", status_code=204)
 def cancel_run(run_id: int, volunteer: VolunteerUser, db: QueriesDep) -> Response:
     run = _require_own_run(db, volunteer, run_id)
-    if run.status != RunStatus.IN_PROGRESS:
-        raise ApiError(409, "RUN_NOT_IN_PROGRESS", "This run isn't in progress")
-
-    order_ids = [order.id for order in db.list_orders_for_run(run.id)]
     # cancelling releases every order back into the available pool
-    db.set_orders_run(order_ids, None, OrderStatus.READY_FOR_PICKUP)
-    for order_id in order_ids:
-        _record_event(db, order_id, OrderStatus.READY_FOR_PICKUP)
-
-    db.update_run(run.model_copy(update={"status": RunStatus.CANCELLED}))
+    _finish_run(
+        db,
+        run,
+        run_status=RunStatus.CANCELLED,
+        order_status=OrderStatus.READY_FOR_PICKUP,
+        release_orders=True,
+    )
     return Response(status_code=204)
 
 
 @router.post("/{run_id}/complete", status_code=204)
 def complete_run(run_id: int, volunteer: VolunteerUser, db: QueriesDep) -> Response:
     run = _require_own_run(db, volunteer, run_id)
-    if run.status != RunStatus.IN_PROGRESS:
-        raise ApiError(409, "RUN_NOT_IN_PROGRESS", "This run isn't in progress")
-
-    order_ids = [order.id for order in db.list_orders_for_run(run.id)]
-    db.set_orders_run(order_ids, run.id, OrderStatus.DELIVERED)
-    for order_id in order_ids:
-        _record_event(db, order_id, OrderStatus.DELIVERED)
-
-    db.update_run(
-        run.model_copy(
-            update={"status": RunStatus.COMPLETED, "completed_at": datetime.now(UTC)}
-        )
+    _finish_run(
+        db, run, run_status=RunStatus.COMPLETED, order_status=OrderStatus.DELIVERED
     )
     return Response(status_code=204)
 
@@ -223,11 +257,8 @@ def remove_run(run_id: int, admin: AdminUser, db: QueriesDep) -> Response:
     run = db.get_run(run_id)
     if run is None:
         raise ApiError(404, "RUN_NOT_FOUND", "No run with that id")
-
-    order_ids = [order.id for order in db.list_orders_for_run(run.id)]
-    db.set_orders_run(order_ids, run.id, OrderStatus.CANCELLED)
-    for order_id in order_ids:
-        _record_event(db, order_id, OrderStatus.CANCELLED)
-
-    db.update_run(run.model_copy(update={"status": RunStatus.CANCELLED}))
+    # unlike a volunteer cancelling, the orders stay on the run and are cancelled with it
+    _finish_run(
+        db, run, run_status=RunStatus.CANCELLED, order_status=OrderStatus.CANCELLED
+    )
     return Response(status_code=204)

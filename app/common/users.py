@@ -4,6 +4,7 @@ to show a user as { userId, name } should use these instead of building UserRefs
 """
 
 from app.common.schemas import UserRef
+from app.errors import ApiError
 from app.queries import Queries
 from app.storage import User
 
@@ -36,3 +37,16 @@ def user_ref_from(users: dict[int, User], user_id: int | None) -> UserRef | None
         return None
     user = users.get(user_id)
     return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
+
+
+"""
+Stops a second account being made with an email that's already used, by any role. Emails are
+compared ignoring case and surrounding spaces (see Queries.get_user_by_email)
+"""
+
+
+def require_unused_email(db: Queries, email: str) -> None:
+    if db.get_user_by_email(email) is not None:
+        raise ApiError(
+            409, "EMAIL_ALREADY_IN_USE", "An account with that email already exists"
+        )

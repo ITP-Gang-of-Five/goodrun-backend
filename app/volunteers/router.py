@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser
+from app.common.users import require_unused_email
 from app.errors import ApiError
 from app.queries import Queries, QueriesDep
 from app.storage import Role, User
@@ -51,8 +52,7 @@ def get_volunteer(volunteer_id: int, admin: AdminUser, db: QueriesDep) -> Volunt
 def create_volunteer(
     body: CreateVolunteerRequest, admin: AdminUser, db: QueriesDep
 ) -> VolunteerOut:
-    if db.get_user_by_email(body.email) is not None:
-        raise ApiError(409, "EMAIL_TAKEN", "A user with that email already exists")
+    require_unused_email(db, body.email)
 
     user = db.add_user(
         User(

@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 ORDERS = "/api/v0/orders/"
@@ -196,3 +197,55 @@ def test_track_order_returns_the_volunteers_last_position(client: TestClient) ->
     # it thus must also have a location assigned to it
     assert body["volunteer"] == {"userId": "2", "name": "Tara Nguyen"}
     assert body["latitude"] == -37.795
+
+
+# a valid order body, each rule test below breaks one thing about it
+def _order(**overrides: object) -> dict[str, object]:
+    return {
+        "fromLocationId": "1",
+        "toLocationId": "2",
+        "size": "SMALL",
+        "urgency": "HIGH",
+        "description": "Test parcel",
+        **overrides,
+    }
+
+
+def test_an_order_cannot_go_to_where_it_came_from(client: TestClient) -> None:
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.post(ORDERS, json=_order(toLocationId="1"), headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_ORDER"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"description": "   "},
+        {"description": "x" * 501},
+        {"pickupNotes": "x" * 301},
+        {"dueAt": "2000-01-01T00:00:00Z"},
+    ],
+)
+def test_create_order_rejects_invalid_fields(
+    client: TestClient, overrides: dict[str, str]
+) -> None:
+    headers = _auth_headers(client, ADMIN)
+
+    response = client.post(ORDERS, json=_order(**overrides), headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_a_cancelled_order_cannot_be_removed_again(client: TestClient) -> None:
+    headers = _auth_headers(client, ADMIN)
+    order_id = client.post(ORDERS, json=_order(), headers=headers).json()["orderId"]
+
+    assert client.post(f"{ORDERS}{order_id}/remove", headers=headers).status_code == 204
+    again = client.post(f"{ORDERS}{order_id}/remove", headers=headers)
+
+    assert again.status_code == 409
+    assert again.json()["error"]["code"] == "ORDER_NOT_AVAILABLE"

@@ -144,3 +144,31 @@ def test_create_run_without_a_car_size_returns_order_too_large(
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "ORDER_TOO_LARGE"
+
+
+# a finished run is final: removing a completed one must not turn its delivered orders into cancelled ones
+def test_admin_cannot_remove_a_completed_run(client: TestClient) -> None:
+    volunteer_headers = _auth_headers(client, VOLUNTEER)
+    admin_headers = _auth_headers(client, ADMIN)
+    run_id = client.post(
+        RUNS, json={"orderIds": [AVAILABLE_ORDER_ID]}, headers=volunteer_headers
+    ).json()["runId"]
+    client.post(f"{RUNS}{run_id}/complete", headers=volunteer_headers)
+
+    removed = client.post(f"{RUNS}{run_id}/remove", headers=admin_headers)
+
+    assert removed.status_code == 409
+    assert removed.json()["error"]["code"] == "RUN_NOT_IN_PROGRESS"
+    order = client.get(f"{ORDERS}{AVAILABLE_ORDER_ID}", headers=admin_headers).json()
+    assert order["status"] == "DELIVERED"
+
+
+def test_create_run_with_too_many_orders_returns_400(client: TestClient) -> None:
+    headers = _auth_headers(client, VOLUNTEER)
+
+    response = client.post(
+        RUNS, json={"orderIds": [str(i) for i in range(1, 22)]}, headers=headers
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_RUN"

@@ -1,4 +1,5 @@
 from app.common.schemas import CamelModel
+from app.common.validation import Address, Name, SuggestionId
 
 
 # location object as a reponse to a request (out)
@@ -30,9 +31,9 @@ class ResolvedLocationOut(CamelModel):
 
 
 class CreateLocationRequest(CamelModel):
-    name: str
-    suggestion_id: str | None = None
-    address: str | None = None
+    name: Name
+    suggestion_id: SuggestionId | None = None
+    address: Address | None = None
 
 
 class LocationIdResponse(CamelModel):
