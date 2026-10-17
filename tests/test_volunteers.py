@@ -19,23 +19,18 @@ def test_admin_can_create_and_then_get_a_volunteer(client: TestClient) -> None:
     headers = _auth_headers(client, ADMIN)
 
     created = client.post(
-        VOLUNTEERS,
-        json={
-            "name": "New Volunteer",
-            "email": "new.volunteer@example.com",
-            "password": "hunter22",
-            "carSize": "SMALL",
-        },
-        headers=headers,
+        VOLUNTEERS, json={"email": "new.volunteer@example.com"}, headers=headers
     )
 
     assert created.status_code == 201
     body = created.json()
     # password should never come back in the response
     assert "password" not in body
-    assert body["name"] == "New Volunteer"
     assert body["email"] == "new.volunteer@example.com"
-    assert body["carSize"] == "SMALL"
+    # they choose these themselves when they set up their account
+    assert body["name"] is None
+    assert body["carSize"] is None
+    assert body["onboarded"] is False
     volunteer_id = body["volunteerId"]
 
     fetched = client.get(f"{VOLUNTEERS}{volunteer_id}", headers=headers)
@@ -48,11 +43,7 @@ def test_create_volunteer_with_taken_email_returns_409(client: TestClient) -> No
 
     response = client.post(
         VOLUNTEERS,
-        json={
-            "name": "Duplicate",
-            "email": VOLUNTEER["email"],
-            "password": "hunter22",
-        },
+        json={"email": VOLUNTEER["email"]},
         headers=headers,
     )
 
@@ -65,11 +56,7 @@ def test_create_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
 
     response = client.post(
         VOLUNTEERS,
-        json={
-            "name": "New Volunteer",
-            "email": "x@example.com",
-            "password": "password1",
-        },
+        json={"email": "x@example.com"},
         headers=headers,
     )
 
@@ -80,11 +67,7 @@ def test_create_volunteer_forbidden_for_non_admin(client: TestClient) -> None:
 def test_create_volunteer_requires_auth(client: TestClient) -> None:
     response = client.post(
         VOLUNTEERS,
-        json={
-            "name": "New Volunteer",
-            "email": "x@example.com",
-            "password": "password1",
-        },
+        json={"email": "x@example.com"},
     )
 
     assert response.status_code == 401
@@ -138,14 +121,7 @@ def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) ->
     # create a new volunteer
     headers = _auth_headers(client, ADMIN)
     created = client.post(
-        VOLUNTEERS,
-        json={
-            "name": "New Volunteer",
-            "email": "new.volunteer@example.com",
-            "password": "hunter22",
-            "carSize": "LARGE",
-        },
-        headers=headers,
+        VOLUNTEERS, json={"email": "new.volunteer@example.com"}, headers=headers
     ).json()
 
     response = client.get(VOLUNTEERS, headers=headers)
@@ -154,23 +130,13 @@ def test_list_volunteers_includes_newly_created_volunteer(client: TestClient) ->
 
 
 # every field rule from app/common/validation.py should be enforced, whatever the frontend sends
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"name": "   "},
-        {"name": "x" * 101},
-        {"email": "not-an-email"},
-        {"password": "short"},
-        {"password": "x" * 129},
-    ],
-)
+@pytest.mark.parametrize("body", [{}, {"email": "not-an-email"}, {"email": ""}])
 def test_create_volunteer_rejects_invalid_fields(
-    client: TestClient, overrides: dict[str, str]
+    client: TestClient, body: dict[str, str]
 ) -> None:
     headers = _auth_headers(client, ADMIN)
-    body = {"name": "Jo", "email": "jo@example.com", "password": "password1"}
 
-    response = client.post(VOLUNTEERS, json={**body, **overrides}, headers=headers)
+    response = client.post(VOLUNTEERS, json=body, headers=headers)
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
@@ -183,7 +149,7 @@ def test_create_volunteer_stores_email_trimmed_and_lower_case(
 
     created = client.post(
         VOLUNTEERS,
-        json={"name": "Jo", "email": "  Jo@Example.COM ", "password": "password1"},
+        json={"email": "  Jo@Example.COM "},
         headers=headers,
     )
 
