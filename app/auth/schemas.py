@@ -17,8 +17,11 @@ class RefreshRequest(BaseModel):
 
 class UserSummary(BaseModel):
     user_id: str = Field(serialization_alias="userId")
-    name: str
+    # None until the account is fully set up
+    name: str | None
     role: str
+    # False: they logged in with an invite code but haven't yet setup their account
+    onboarded: bool
 
 
 class TokenPair(BaseModel):

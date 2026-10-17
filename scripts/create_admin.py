@@ -37,6 +37,7 @@ def create_admin(db: Queries, name: str, email: str, password: str) -> User:
     """Raises ValidationError for bad details, or ApiError if the email is taken."""
     details = NewAdmin(name=name, email=email, password=password)
     require_unused_email(db, details.email)
+    now = datetime.now(UTC)
     return db.add_user(
         User(
             id=0,
@@ -44,7 +45,8 @@ def create_admin(db: Queries, name: str, email: str, password: str) -> User:
             email=details.email,
             password_hash=hash_password(details.password),
             role=Role.ADMIN,
-            created_at=datetime.now(UTC),
+            created_at=now,
+            onboarded_at=now,
         )
     )
 

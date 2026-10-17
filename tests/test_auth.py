@@ -11,10 +11,10 @@ from app.auth.passwords import hash_password, verify_password
 from app.auth.tokens import load_secret
 from app.errors import ApiError
 from app.queries import Queries
+from tests.accounts import set_up_volunteer
 
 LOGIN = "/api/v0/auth/login"
 REFRESH = "/api/v0/auth/refresh-token"
-VOLUNTEERS = "/api/v0/volunteers/"
 
 # hard code the only creds we have for test cases
 ADMIN = {"email": "admin", "password": "admin"}
@@ -28,7 +28,12 @@ def test_login_returns_tokens_and_the_user(client: TestClient) -> None:
     body = response.json()
     assert body["access_token"]
     assert body["refresh_token"]
-    assert body["user"] == {"userId": "1", "name": "Admin", "role": "ADMIN"}
+    assert body["user"] == {
+        "userId": "1",
+        "name": "Admin",
+        "role": "ADMIN",
+        "onboarded": True,
+    }
 
 
 def test_wrong_password_and_unknown_email_get_the_same_error(
@@ -69,16 +74,12 @@ def test_a_made_up_token_is_rejected(client: TestClient) -> None:
 def test_passwords_are_stored_hashed_and_still_work(
     client: TestClient, queries: Queries
 ) -> None:
-    token = client.post(LOGIN, json=ADMIN).json()["access_token"]
     new_account = {"email": "hashed@example.com", "password": "hunter22"}
-    client.post(
-        VOLUNTEERS,
-        json={"name": "Hashed", **new_account},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    set_up_volunteer(client, **new_account)
 
     stored = queries.get_user_by_email(new_account["email"])
     assert stored is not None
+    assert stored.password_hash is not None
     assert stored.password_hash != new_account["password"]
     assert stored.password_hash.startswith("$argon2id$")
     assert client.post(LOGIN, json=new_account).status_code == 200

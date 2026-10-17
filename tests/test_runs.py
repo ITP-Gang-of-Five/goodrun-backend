@@ -7,9 +7,11 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from psycopg.errors import UniqueViolation
 
+from app.auth.passwords import hash_password
 from app.common.validation import RUN_MAX_ORDERS
 from app.queries import Queries
-from app.storage import Run, RunStatus
+from app.storage import Role, Run, RunStatus, User
+from tests.accounts import set_up_volunteer
 
 RUNS = "/api/v0/runs/"
 ORDERS = "/api/v0/orders/"
@@ -32,19 +34,7 @@ def _auth_headers(client: TestClient, credentials: dict[str, str]) -> dict[str, 
 def _free_volunteer(client: TestClient) -> dict[str, str]:
     # Tara (the seeded volunteer) is already on a run, and a volunteer can only be on one
     # at a time, so anything that starts a run does it as a new volunteer with no run yet
-    client.post(
-        "/api/v0/volunteers/",
-        json={
-            "name": "Free Volunteer",
-            "email": "free.volunteer@example.com",
-            "password": "hunter22",
-            "carSize": "LARGE",
-        },
-        headers=_auth_headers(client, ADMIN),
-    )
-    return _auth_headers(
-        client, {"email": "free.volunteer@example.com", "password": "hunter22"}
-    )
+    return set_up_volunteer(client, "free.volunteer@example.com")
 
 
 def _step(order_id: str, step_type: str) -> dict[str, str]:
@@ -182,13 +172,21 @@ def test_create_run_with_too_many_orders_returns_400(client: TestClient) -> None
 
 
 def test_create_run_without_a_car_size_returns_order_too_large(
-    client: TestClient,
+    client: TestClient, queries: Queries
 ) -> None:
-    # a volunteer created without a car size can't build a run until they set one
-    client.post(
-        "/api/v0/volunteers/",
-        json={"name": "No Car", "email": "no.car@example.com", "password": "hunter22"},
-        headers=_auth_headers(client, ADMIN),
+    # volunteers choose a car size when they set up now, but ones made before that might
+    # not have one, and can't build a run until they set it
+    now = datetime.now(UTC)
+    queries.add_user(
+        User(
+            id=0,
+            name="No Car",
+            email="no.car@example.com",
+            password_hash=hash_password("hunter22"),
+            role=Role.VOLUNTEER,
+            created_at=now,
+            onboarded_at=now,
+        )
     )
     headers = _auth_headers(
         client, {"email": "no.car@example.com", "password": "hunter22"}

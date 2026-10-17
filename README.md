@@ -48,6 +48,7 @@ Logins for the seeded accounts:
 | `admin` | `admin` | ADMIN |
 | `tara@example.com` | `volunteer` | VOLUNTEER |
 | `stores@rmh.example.com` | `organisation` | ORGANISATION |
+| `invited@example.com` | `123456` (an invite code, works once) | VOLUNTEER, not set up yet |
 
 Passwords are stored as Argon2 hashes. If these logins stop working your database still has
 plain text passwords, rebuild it with `uv run python scripts/db.py app/schema.sql app/seed.sql`.
@@ -57,6 +58,16 @@ plain text passwords, rebuild it with `uv run python scripts/db.py app/schema.sq
 
 Never load `seed.sql` in production. Create the first admin with
 `uv run python scripts/create_admin.py` and set `ENVIRONMENT=production` to hide `/docs`.
+
+
+# Inviting Volunteers
+
+You now just enter an email and an email will be set. They will be sent from ur gmail cccount
+
+```
+SMTP_USER=the-gmail-address@gmail.com
+SMTP_PASSWORD=an-app-password-for-it
+```
 
 
 # Locations and routing

@@ -8,8 +8,10 @@ from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
 from app.auth.limits import login_attempts
+from app.common import mail
 from app.main import app
 from app.queries import DATABASE_URL, Queries, get_queries
+from tests.accounts import sent_emails
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +21,15 @@ def forget_failed_logins() -> Iterator[None]:
     login_attempts.reset()
     yield
     login_attempts.reset()
+
+
+@pytest.fixture(autouse=True)
+def catch_emails(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # no test sends a real email, they're kept in sent_emails for the test to read instead
+    sent_emails.clear()
+    monkeypatch.setattr(mail, "deliver", sent_emails.append)
+    yield
+    sent_emails.clear()
 
 
 @pytest.fixture(autouse=True)

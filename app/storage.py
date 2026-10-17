@@ -63,13 +63,26 @@ table, with the same fields, so a row maps straight onto one of these.
 
 class User(BaseModel):
     id: int
-    name: str
+    # None for an invited account until they set it up, they choose their own
+    name: str | None = None
     email: str
-    # an Argon2 hash of the password (see app/auth/passwords.py), never the password itself
-    password_hash: str
+    # an Argon2 hash of the password (see app/auth/passwords.py), never the password itself.
+    # None for an invited account until they set it up
+    password_hash: str | None = None
     role: Role
     # lives in the volunteer_preferences table, so it is None for admins and orgs
     car_size: CarSize | None = None
+    created_at: datetime
+    # when they set up their account. None means they were invited and haven't yet
+    onboarded_at: datetime | None = None
+
+
+# the one time code emailed to an invited account (see app/auth/invites.py)
+class Invite(BaseModel):
+    user_id: int
+    code_hash: str
+    failed_attempts: int = 0
+    expires_at: datetime
     created_at: datetime
 
 

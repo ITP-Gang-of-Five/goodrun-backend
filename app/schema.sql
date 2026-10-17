@@ -1,25 +1,41 @@
 -- Good Run database schema (Sprint 2). Mirrors the Data Model diagram.
 
 DROP TABLE IF EXISTS
-    run_steps, order_images, order_events, orders, runs,
+    run_steps, order_images, order_events, orders, runs, invites,
     volunteer_locations, volunteer_preferences, locations, users
 CASCADE;
 
 
 -- Every account: admins, volunteers and organisations. An organisation's account
 -- name is its organisation name. There is no sign up, admins create accounts.
+-- An invited account starts with just an email. The person sets their own name and
+-- password the first time they log in, which is when onboarded_at gets set.
 CREATE TABLE users (
     user_id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email         VARCHAR(255) NOT NULL,
-    name          VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    name          VARCHAR(255) NULL,
+    password_hash VARCHAR(255) NULL,
     role          TEXT NOT NULL CHECK (role IN ('ADMIN', 'VOLUNTEER', 'ORGANISATION')),
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    onboarded_at  TIMESTAMPTZ NULL,
+    -- once set up, an account always has a name and a password
+    CHECK (onboarded_at IS NULL OR (name IS NOT NULL AND password_hash IS NOT NULL))
 );
 
 -- emails are unique across all roles and compared ignoring case, so the index is on
 -- lower(email). Enforcing it here means two simultaneous signups cannot both win.
 CREATE UNIQUE INDEX users_email_key ON users (lower(email));
+
+
+-- The one time password emailed to someone who has been invited, where there exists at most one per account.
+-- The code itself also only works once so its deleted when used. We store a hash of the code btw, just like passwrods
+CREATE TABLE invites (
+    user_id         BIGINT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    code_hash       VARCHAR(255) NOT NULL,
+    failed_attempts INT NOT NULL DEFAULT 0,
+    expires_at      TIMESTAMPTZ NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 
 -- Volunteer only settings, at most one row per volunteer (1 : 0..1 with users).

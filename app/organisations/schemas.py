@@ -1,22 +1,22 @@
 from datetime import datetime
 
 from app.common.schemas import CamelModel
-from app.common.validation import Email, Name, Password
+from app.common.validation import Email
 
 
 # an organisation's profile as seen by an admin (never includes the password)
 class OrganisationOut(CamelModel):
     organisation_id: str
-    name: str
+    name: str | None
     email: str
     created_at: datetime
+    onboarded: bool
 
 
-# input for registering a new organisation account
+# input for inviting a new organisation. they choose their own name and password when they
+# first log in
 class CreateOrganisationRequest(CamelModel):
-    name: Name
     email: Email
-    password: Password
 
 
 # every organisation, as returned by GET organisations/
