@@ -12,7 +12,7 @@ from app.storage import Role
 router = APIRouter(prefix="/me", tags=["me"])
 
 
-#NB: this also works for someone who hasn't completed onboarding
+# NB: this also works for someone who hasn't completed onboarding
 @router.get("/")
 def get_my_profile(actor: SignedInUser) -> ProfileOut:
     # return a ProfileOut object of the profile
@@ -53,15 +53,14 @@ def update_my_profile(
         queries.set_car_size(actor.id, changes["car_size"])
 
 
-
-#The endpoint to trigger for someone who has logged in but hasn't completed onboarding. Until onboarding
-#is completed every endpoint will refuse them with 403 NOT_ONBOARDED
+# The endpoint to trigger for someone who has logged in but hasn't completed onboarding. Until onboarding
+# is completed every endpoint will refuse them with 403 NOT_ONBOARDED
 @router.post("/onboarding", status_code=204)
 def onboard(body: OnboardingRequest, actor: SignedInUser, queries: QueriesDep) -> None:
     if actor.onboarded_at is not None:
         raise ApiError(409, "ALREADY_ONBOARDED", "Your account is already set up")
 
-    #only volunteer's have a car size
+    # only volunteer's have a car size
     if actor.role == Role.VOLUNTEER and body.car_size is None:
         raise ApiError(422, "VALIDATION_ERROR", "carSize: volunteers must choose one")
     if actor.role != Role.VOLUNTEER and body.car_size is not None:

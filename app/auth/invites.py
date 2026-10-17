@@ -10,7 +10,7 @@ CODE_LENGTH = 6
 INVITE_LIFETIME = timedelta(days=7)
 MAX_FAILED_ATTEMPTS = 5
 
-#TODO: in the future I'm sure this could be abstracted to a nicer location, especially if we want to make it fancier / put javascript in it
+# TODO: in the future I'm sure this could be abstracted to a nicer location, especially if we want to make it fancier / put javascript in it
 INVITE_BODY = """Hi,
 
 You've been invited to join Good Run. To set up your account, open the Good

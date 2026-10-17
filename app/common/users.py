@@ -9,7 +9,7 @@ from app.queries import Queries
 from app.storage import User
 
 
-#NB: for someone without a name (i.e a user who isn't signed up yet) their email is returned
+# NB: for someone without a name (i.e a user who isn't signed up yet) their email is returned
 def _name(user: User | None) -> str:
     if user is None:
         return "Unknown"

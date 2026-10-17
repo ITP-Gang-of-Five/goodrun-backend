@@ -73,7 +73,7 @@ def create_organisation(
     return _organisation_out(user)
 
 
-#Sends an organisation a new codeif it was lost or expired
+# Sends an organisation a new codeif it was lost or expired
 @router.post("/{organisation_id}/resend-invite", status_code=204)
 def resend_invite(organisation_id: int, admin: AdminUser, db: QueriesDep) -> None:
     user = _require_organisation(db, organisation_id)

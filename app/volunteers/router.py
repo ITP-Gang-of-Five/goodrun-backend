@@ -69,7 +69,7 @@ def create_volunteer(
     return _volunteer_out(user)
 
 
-#Sends a volunteer a new code if they lost it or it timed out
+# Sends a volunteer a new code if they lost it or it timed out
 @router.post("/{volunteer_id}/resend-invite", status_code=204)
 def resend_invite(volunteer_id: int, admin: AdminUser, db: QueriesDep) -> None:
     user = _require_volunteer(db, volunteer_id)
