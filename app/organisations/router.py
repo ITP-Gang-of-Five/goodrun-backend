@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser
-from app.auth.passwords import hash_password
+from app.auth.invites import send_invite
 from app.common.users import require_unused_email
 from app.errors import ApiError
 from app.organisations.schemas import (
@@ -23,6 +23,7 @@ def _organisation_out(user: User) -> OrganisationOut:
         name=user.name,
         email=user.email,
         created_at=user.created_at,
+        onboarded=user.onboarded_at is not None,
     )
 
 
@@ -54,7 +55,6 @@ def get_organisation(
     return _organisation_out(_require_organisation(db, organisation_id))
 
 
-# register a new organisation account
 @router.post("/", status_code=201)
 def create_organisation(
     body: CreateOrganisationRequest, admin: AdminUser, db: QueriesDep
@@ -64,11 +64,23 @@ def create_organisation(
     user = db.add_user(
         User(
             id=0,
-            name=body.name,
             email=body.email,
-            password_hash=hash_password(body.password),
             role=Role.ORGANISATION,
             created_at=datetime.now(UTC),
         )
     )
+    send_invite(db, user)
     return _organisation_out(user)
+
+
+#Sends an organisation a new codeif it was lost or expired
+@router.post("/{organisation_id}/resend-invite", status_code=204)
+def resend_invite(organisation_id: int, admin: AdminUser, db: QueriesDep) -> None:
+    user = _require_organisation(db, organisation_id)
+    if user.onboarded_at is not None:
+        raise ApiError(
+            409,
+            "ALREADY_ONBOARDED",
+            "This organisation has already set up their account",
+        )
+    send_invite(db, user)

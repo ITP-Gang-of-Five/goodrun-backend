@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser
-from app.auth.passwords import hash_password
+from app.auth.invites import send_invite
 from app.common.users import require_unused_email
 from app.errors import ApiError
 from app.queries import Queries, QueriesDep
@@ -20,6 +20,7 @@ def _volunteer_out(user: User) -> VolunteerOut:
         email=user.email,
         car_size=user.car_size,
         created_at=user.created_at,
+        onboarded=user.onboarded_at is not None,
     )
 
 
@@ -48,7 +49,8 @@ def get_volunteer(volunteer_id: int, admin: AdminUser, db: QueriesDep) -> Volunt
     return _volunteer_out(_require_volunteer(db, volunteer_id))
 
 
-# register a new volunteer account
+# invite a new volunteer. the account is made with just their email, and they're emailed
+# a code to log in with, after which they set up the rest themselves (see app/auth/invites.py)
 @router.post("/", status_code=201)
 def create_volunteer(
     body: CreateVolunteerRequest, admin: AdminUser, db: QueriesDep
@@ -58,15 +60,21 @@ def create_volunteer(
     user = db.add_user(
         User(
             id=0,
-            name=body.name,
             email=body.email,
-            password_hash=hash_password(body.password),
             role=Role.VOLUNTEER,
             created_at=datetime.now(UTC),
         )
     )
-    # car_size lives in volunteer_preferences, so it's saved separately from the user
-    if body.car_size is not None:
-        db.set_car_size(user.id, body.car_size)
-        user = user.model_copy(update={"car_size": body.car_size})
+    send_invite(db, user)
     return _volunteer_out(user)
+
+
+#Sends a volunteer a new code if they lost it or it timed out
+@router.post("/{volunteer_id}/resend-invite", status_code=204)
+def resend_invite(volunteer_id: int, admin: AdminUser, db: QueriesDep) -> None:
+    user = _require_volunteer(db, volunteer_id)
+    if user.onboarded_at is not None:
+        raise ApiError(
+            409, "ALREADY_ONBOARDED", "This volunteer has already set up their account"
+        )
+    send_invite(db, user)

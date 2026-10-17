@@ -15,6 +15,7 @@ from psycopg_pool import ConnectionPool
 
 from app.storage import (
     CarSize,
+    Invite,
     Location,
     Order,
     OrderEvent,
@@ -66,6 +67,7 @@ _USER_COLUMNS = """
     u.password_hash,
     u.role,
     u.created_at,
+    u.onboarded_at,
     vp.car_size
 FROM users u
 LEFT JOIN volunteer_preferences vp ON vp.volunteer_id = u.user_id
@@ -178,11 +180,19 @@ class Queries:
         # car_size is not here, it lives in its own table, use set_car_size after.
         row = self._connection.execute(
             """
-            INSERT INTO users (email, name, password_hash, role, created_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO users
+                (email, name, password_hash, role, created_at, onboarded_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING user_id
             """,
-            (user.email, user.name, user.password_hash, user.role, user.created_at),
+            (
+                user.email,
+                user.name,
+                user.password_hash,
+                user.role,
+                user.created_at,
+                user.onboarded_at,
+            ),
         ).fetchone()
         assert row is not None
         return user.model_copy(update={"id": row["user_id"]})
@@ -192,10 +202,17 @@ class Queries:
         result = self._connection.execute(
             """
             UPDATE users
-            SET email = %s, name = %s, password_hash = %s, role = %s
+            SET email = %s, name = %s, password_hash = %s, role = %s, onboarded_at = %s
             WHERE user_id = %s
             """,
-            (user.email, user.name, user.password_hash, user.role, user.id),
+            (
+                user.email,
+                user.name,
+                user.password_hash,
+                user.role,
+                user.onboarded_at,
+                user.id,
+            ),
         )
         if result.rowcount == 0:
             raise KeyError(f"user {user.id} does not exist")
@@ -210,6 +227,46 @@ class Queries:
             """,
             (volunteer_id, car_size),
         )
+
+    def get_invite(self, user_id: int) -> Invite | None:
+        row = self._connection.execute(
+            """
+            SELECT user_id, code_hash, failed_attempts, expires_at, created_at
+            FROM invites WHERE user_id = %s
+            """,
+            (user_id,),
+        ).fetchone()
+        return Invite(**row) if row else None
+
+    def set_invite(self, invite: Invite) -> None:
+        # an account has at most one invite, so sending a new one replaces the old code
+        self._connection.execute(
+            """
+            INSERT INTO invites (user_id, code_hash, failed_attempts, expires_at, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                code_hash = EXCLUDED.code_hash,
+                failed_attempts = EXCLUDED.failed_attempts,
+                expires_at = EXCLUDED.expires_at,
+                created_at = EXCLUDED.created_at
+            """,
+            (
+                invite.user_id,
+                invite.code_hash,
+                invite.failed_attempts,
+                invite.expires_at,
+                invite.created_at,
+            ),
+        )
+
+    def record_failed_invite_attempt(self, user_id: int) -> None:
+        self._connection.execute(
+            "UPDATE invites SET failed_attempts = failed_attempts + 1 WHERE user_id = %s",
+            (user_id,),
+        )
+
+    def delete_invite(self, user_id: int) -> None:
+        self._connection.execute("DELETE FROM invites WHERE user_id = %s", (user_id,))
 
     def get_volunteer_stats(self, volunteer_id: int) -> dict[str, Any]:
         """

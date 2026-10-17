@@ -8,6 +8,14 @@ from app.errors import ApiError
 from app.queries import Queries
 from app.storage import User
 
+
+#NB: for someone without a name (i.e a user who isn't signed up yet) their email is returned
+def _name(user: User | None) -> str:
+    if user is None:
+        return "Unknown"
+    return user.name or user.email
+
+
 """
 Returns a UserRef for a user based on their id
 """
@@ -15,7 +23,7 @@ Returns a UserRef for a user based on their id
 
 def user_ref(db: Queries, user_id: int) -> UserRef:
     user = db.get_user(user_id)
-    return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
+    return UserRef(user_id=str(user_id), name=_name(user))
 
 
 """
@@ -36,7 +44,7 @@ def user_ref_from(users: dict[int, User], user_id: int | None) -> UserRef | None
     if user_id is None:
         return None
     user = users.get(user_id)
-    return UserRef(user_id=str(user_id), name=user.name if user else "Unknown")
+    return UserRef(user_id=str(user_id), name=_name(user))
 
 
 """

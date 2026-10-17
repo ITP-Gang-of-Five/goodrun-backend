@@ -27,7 +27,7 @@ Retrieve the current User (storage model) based on their auth header
 """
 
 
-def get_current_user(queries: QueriesDep, credentials: BearerToken = None) -> User:
+def get_signed_in_user(queries: QueriesDep, credentials: BearerToken = None) -> User:
     # requests must have the Authorization header with a bearer token
     if credentials is None:
         raise ApiError(401, "UNAUTHORISED", "Missing or invalid Authorization header")
@@ -37,6 +37,18 @@ def get_current_user(queries: QueriesDep, credentials: BearerToken = None) -> Us
     user = queries.get_user(user_id)
     if user is None:
         raise ApiError(401, "UNAUTHORISED", "User doesn't exist")
+    return user
+
+
+# whoever is signed in (including non onboarded user)
+SignedInUser = Annotated[User, Depends(get_signed_in_user)]
+
+
+def get_current_user(user: SignedInUser) -> User:
+    if user.onboarded_at is None:
+        raise ApiError(
+            403, "NOT_ONBOARDED", "Finish setting up your account before doing that"
+        )
     return user
 
 

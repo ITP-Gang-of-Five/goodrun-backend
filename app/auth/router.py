@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
+from app.auth.invites import is_usable
 from app.auth.limits import client_ip, login_attempts
 from app.auth.passwords import DUMMY_HASH, verify_password
 
@@ -18,8 +20,24 @@ from app.queries import QueriesDep
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login")
-def login(body: LoginRequest, request: Request, queries: QueriesDep) -> LoginResponse:
+def _wrong_credentials() -> JSONResponse:
+    # NB: this is returend rather than raised since that would rollback the database change
+    return JSONResponse(
+        status_code=401,
+        content={
+            "error": {
+                "code": "INVALID_CREDENTIALS",
+                "description": "Incorrect email or password",
+            }
+        },
+    )
+
+
+# NB: response_model is set because a wrong password returns a JSONResponse instead
+@router.post("/login", response_model=LoginResponse)
+def login(
+    body: LoginRequest, request: Request, queries: QueriesDep
+) -> LoginResponse | JSONResponse:
     # refuse straight away if whoever is asking has had too many wrong passwords recently
     ip = client_ip(request)
     login_attempts.check(ip, body.email)
@@ -27,26 +45,41 @@ def login(body: LoginRequest, request: Request, queries: QueriesDep) -> LoginRes
     # grab the user by their email (since that is what is inputted into the request body)
     user = queries.get_user_by_email(body.email)
 
-    # NB: the password is checked even when no account has this email (against a dummy
-    # hash), so an unknown email is as slow to reject as a wrong password and the timing
-    # doesn't give away which emails have accounts
-    password_ok = verify_password(
-        body.password, user.password_hash if user else DUMMY_HASH
-    )
+    # for a person whose been invited, they login with their onboarding password, everyone else
+    # just uses their real password
+    invite = queries.get_invite(user.id) if user and user.onboarded_at is None else None
+
+    if user is not None and user.onboarded_at is None:
+        usable = is_usable(invite)
+        stored_hash = invite.code_hash if invite and usable else DUMMY_HASH
+        password_ok = verify_password(body.password.strip(), stored_hash) and usable
+    else:
+        # check against a dummmy hash when no acconut has this email to defend against attackers
+        stored_hash = user.password_hash if user and user.password_hash else DUMMY_HASH
+        password_ok = verify_password(body.password, stored_hash)
 
     # if user doesn't exist or the password isn't correct
     if user is None or not password_ok:
         login_attempts.record_failure(ip, body.email)
-        raise ApiError(401, "INVALID_CREDENTIALS", "Incorrect email or password")
+        if invite is not None:
+            queries.record_failed_invite_attempt(invite.user_id)
+        return _wrong_credentials()
 
     login_attempts.clear(ip, body.email)
+    # NB: we delete the invite code if it was used, as this should only work one time!!!!
+    if invite is not None:
+        queries.delete_invite(user.id)
 
     return LoginResponse(
-        # make all of the necessary tokens for this user
         access_token=make_token(user, "access"),
         refresh_token=make_token(user, "refresh"),
         # create a UserSummary type to be returned with the user's attributes
-        user=UserSummary(user_id=str(user.id), name=user.name, role=user.role),
+        user=UserSummary(
+            user_id=str(user.id),
+            name=user.name,
+            role=user.role,
+            onboarded=user.onboarded_at is not None,
+        ),
     )
 
 
