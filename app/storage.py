@@ -41,6 +41,11 @@ class RunStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class RunStepType(StrEnum):
+    PICKUP = "PICKUP"
+    DROPOFF = "DROPOFF"
+
+
 class OrderStatus(StrEnum):
     PENDING = "PENDING"
     READY_FOR_PICKUP = "READY_FOR_PICKUP"
@@ -101,10 +106,18 @@ class Order(BaseModel):
     due_at: datetime | None = None
     pickup_notes: str | None = None
     dropoff_notes: str | None = None
-    # position of this order within its run, None while the order has no run
-    sequence: int | None = None
     created_by_id: int
     created_at: datetime
+
+
+# A single stop on a runs route (either picking up or dropping off one of its orders)
+class RunStep(BaseModel):
+    run_id: int
+    order_id: int
+    type: RunStepType
+    # the index of this step in the route
+    position: int
+    completed_at: datetime | None = None
 
 
 class OrderEvent(BaseModel):
