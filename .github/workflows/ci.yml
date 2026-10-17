@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
@@ -83,6 +82,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      #ci only secret, not to be used elsewhere
+      JWT_SECRET: ci-only-jwt-secret-not-used-anywhere-real
 
     steps:
       - uses: actions/checkout@v7

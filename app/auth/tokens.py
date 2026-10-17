@@ -3,12 +3,32 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import jwt
+from dotenv import load_dotenv
 
 from app.errors import ApiError
 from app.storage import User
 
-# We can set JWT_SECRET in the future (and definitely should) but for now without the db just use this
-SECRET = os.environ.get("JWT_SECRET", "dev-only-secret-shhhhhhhhh")
+load_dotenv()
+
+SECRET_MIN_LENGTH = 32
+
+
+def load_secret() -> str:
+    """
+    The key every login token is signed with. Anyone who knows it can make a token for
+    any account, so there is deliberately no default: the server refuses to start
+    without one rather than quietly using a key that is sitting in the repo.
+    """
+    secret = os.environ.get("JWT_SECRET", "")
+    if len(secret) < SECRET_MIN_LENGTH:
+        raise RuntimeError(
+            f"JWT_SECRET must be set to a random string of at least {SECRET_MIN_LENGTH}"
+            " characters, e.g. the output of `openssl rand -hex 32` (see the README)"
+        )
+    return secret
+
+
+SECRET = load_secret()
 
 LIFETIMES = {
     # access tokens last for 1 hour

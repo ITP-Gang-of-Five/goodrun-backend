@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser
+from app.auth.passwords import hash_password
 from app.common.users import require_unused_email
 from app.errors import ApiError
 from app.organisations.schemas import (
@@ -65,7 +66,7 @@ def create_organisation(
             id=0,
             name=body.name,
             email=body.email,
-            password_hash=body.password,
+            password_hash=hash_password(body.password),
             role=Role.ORGANISATION,
             created_at=datetime.now(UTC),
         )

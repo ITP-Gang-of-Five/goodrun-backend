@@ -60,7 +60,7 @@ class User(BaseModel):
     id: int
     name: str
     email: str
-    # still holds plain text, the column is named for where this is going once we hash
+    # an Argon2 hash of the password (see app/auth/passwords.py), never the password itself
     password_hash: str
     role: Role
     # lives in the volunteer_preferences table, so it is None for admins and orgs
