@@ -4,11 +4,19 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.common.handlers import init_exception_handlers
 from app.errors import add_error_handler
 from app.queries import pool
+
+"""
+The websites that are allowed to call this API from the browser, which is only our frontend
+deployed on cloud flare pages.
+Locally ours machines go through vite's api proxy so it never needs this
+"""
+ALLOWED_ORIGINS = ["https://goodrun-frontend.maximusdebski.workers.dev"]
 
 
 @asynccontextmanager
@@ -36,6 +44,15 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
     **docs_urls(os.environ.get("ENVIRONMENT")),
+)
+
+# logins are sent as an Authorization header rather than a cookie, so credentials
+# don't need to be allowed
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 # add error handling
 add_error_handler(app)
